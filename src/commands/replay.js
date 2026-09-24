@@ -17,6 +17,7 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
+import net from 'node:net';
 import tls from 'node:tls';
 import zlib from 'node:zlib';
 
@@ -196,7 +197,7 @@ function sendViaProxy(plan, values, timeoutMs) {
     throw usageError(`Unsupported URL scheme for replay: ${target.protocol}`);
   }
 
-  // HTTPS through a proxy: CONNECT, then TLS to the proxy-issued certificate.
+  // HTTPS through a proxy: CONNECT, then TLS over the resulting tunnel.
   const agent = new https.Agent({ keepAlive: false, maxSockets: 1 });
   agent.createConnection = (options, callback) => {
     const connectReq = http.request({
@@ -205,6 +206,11 @@ function sendViaProxy(plan, values, timeoutMs) {
       method: 'CONNECT',
       path: `${target.hostname}:${target.port || 443}`,
       headers: { host: `${target.hostname}:${target.port || 443}` },
+      // The CONNECT is itself a request to Reqable's proxy, so it needs its own
+      // connection for the same reason sendViaProxy reuses none: a socket this
+      // process already used for API calls gets read as another API call, and
+      // the CONNECT then hangs up without a tunnel.
+      agent: ONE_SHOT,
     });
     connectReq.once('connect', (res, socket) => {
       if (res.statusCode !== 200) {
@@ -215,10 +221,13 @@ function sendViaProxy(plan, values, timeoutMs) {
       const secure = tls.connect(
         {
           socket,
-          servername: target.hostname,
-          // The proxy MITMs this connection, so the presented leaf certificate
-          // is Reqable's. Verification can only pass if that CA is trusted by
-          // this process; otherwise the caller must opt in with --insecure.
+          // SNI is a host name mechanism; passing an IP literal is a protocol
+          // violation that Node warns about, and the target is still verified
+          // against the IP below.
+          ...(net.isIP(target.hostname) ? {} : { servername: target.hostname }),
+          // Reqable intercepts this tunnel, so the leaf certificate comes from
+          // it. Verification can only pass when that CA is trusted by this
+          // process, which is why the caller must opt in with --insecure.
           rejectUnauthorized: !values.insecure,
         },
         () => callback(null, secure),

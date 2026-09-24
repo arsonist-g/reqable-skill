@@ -219,9 +219,13 @@ async function exportCommand(api, values) {
 
   const text = `${JSON.stringify(document, null, 2)}\n`;
 
+  // Stdout carries the JSON envelope this command prints. Writing the document
+  // there too would put two JSON documents on one stream, which a caller cannot
+  // parse, so this is refused rather than emitted.
   if (values.out === '-') {
-    process.stdout.write(text);
-    return { data: { format, entries: records.length, totalMatched: total, filters, writtenTo: 'stdout' } };
+    throw usageError(
+      "Stdout carries this command's JSON envelope, so --out - is not supported. Name a file instead.",
+    );
   }
 
   fs.writeFileSync(values.out, text, 'utf8');
@@ -243,7 +247,7 @@ const exportHelp = {
   command: 'capture export',
   summary: 'export captured traffic to a HAR 1.2 or raw JSON file',
   options: [
-    { name: '--out <file>', description: 'Destination file. Required. Use - to write to stdout.' },
+    { name: '--out <file>', description: 'Destination file. Required. Stdout is reserved for the JSON envelope, so - is not accepted.' },
     { name: '--format <f>', description: 'Output format.', values: ['har', 'json'], default: 'har' },
     { name: '--limit <n>', description: 'Maximum records to export; 0 means no limit.', default: String(DEFAULT_LIMIT) },
     { name: '--sort <s>', description: 'Record order.', values: ['newest', 'oldest'], default: 'newest' },
