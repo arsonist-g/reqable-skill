@@ -1,8 +1,10 @@
 # Verification record
 
-Answers to the six open questions in `sketch.md` §3.2, the route decision that follows from them, and the findings that changed the plan. Each answer carries evidence that can be re-checked: a source citation with a file and line, or a command whose output is quoted.
+Answers to the six open questions the project started with, the route decision that follows from them, and the findings that changed the plan. Each answer carries evidence that can be re-checked: a source citation with a file and line, or a command whose output is quoted.
 
-## §3.2, one answer per item
+The sketch that posed those six questions is not part of this repository; it is kept with the project's private documents, and this file stands on its own. Where the text below says "the sketch", it means that original document.
+
+## One answer per open question
 
 ### 1. The complete endpoint table of Reqable's local API
 
