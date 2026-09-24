@@ -261,6 +261,12 @@ docs/verification.md      verification record and route decision
 SKILL.md                  the agent-facing skill
 ```
 
+## Project memory
+
+`project-memory/` is a git submodule pointing at a **private** repository that holds this project's design notes, decision log and task records. Nothing in it is needed to build, test, use or contribute to the CLI.
+
+That has one practical consequence worth knowing before you clone: `git clone --recursive` will try to fetch the submodule and fail with an access error unless you have been granted access to it. A plain `git clone` is the right command here. An empty `project-memory/` directory after cloning is expected, not a broken checkout.
+
 ## Publishing and Reqable versions
 
 Reqable's local API is undocumented and it changes between releases. This package therefore publishes one release line per Reqable line, and `main` always tracks the newest one this project supports.
