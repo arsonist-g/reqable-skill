@@ -4,3 +4,4 @@ npm-debug.log*
 .e2e-*
 .pi/
 project-memory/
+*.tgz

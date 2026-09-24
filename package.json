@@ -1,7 +1,7 @@
 {
   "name": "reqable-cli",
   "version": "1.0.0",
-  "description": "Command-line front end for Reqable's local API: list, inspect, export and replay captured traffic without registering an MCP server.",
+  "description": "Command-line front end for Reqable's local capture API: list, inspect, export and replay captured traffic without registering an MCP server.",
   "license": "MIT",
   "type": "module",
   "bin": {
@@ -11,15 +11,22 @@
     "bin/",
     "src/",
     "SKILL.md",
+    "skill-zh.md",
+    "references/",
     "README.md",
-    "docs/"
+    "docs/",
+    "LICENSE"
   ],
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.11.0"
   },
   "scripts": {
+    "test": "node --test test/unit.test.mjs",
     "e2e": "node test/e2e.mjs",
-    "help": "node bin/reqable-cli.js --help"
+    "e2e:extra": "node test/e2e-extra.mjs",
+    "check": "npm test && node test/e2e.mjs && node test/e2e-extra.mjs",
+    "check:line": "node scripts/check-version-line.mjs",
+    "prepublishOnly": "npm test && node scripts/check-version-line.mjs"
   },
   "keywords": [
     "reqable",
@@ -28,7 +35,13 @@
     "capture",
     "proxy",
     "mitm",
-    "agent"
+    "agent",
+    "skill"
   ],
-  "dependencies": {}
+  "dependencies": {},
+  "reqable": {
+    "supported": "3.2",
+    "verifiedWith": "3.2.23",
+    "note": "The Reqable release line this build was written against. src/reqable.js holds the same values as SUPPORTED_REQABLE and VERIFIED_REQABLE, and test/unit.test.mjs fails if the two disagree."
+  }
 }

@@ -128,7 +128,7 @@ Rules:
 | Command | Description | Parameters | Notes |
 |---|---|---|---|
 | `rule list` | List breakpoints, rewrites and scripts. | `--type <all\|breakpoint\|rewrite\|script>` | Defaults to `all`. `data.rules` holds Reqable's own rule objects per type, `data.counts` the totals. |
-| `rule set` | Enable, disable or create a rule, or toggle a whole rule feature. | `--type <breakpoint\|rewrite\|script>*` `--feature <on\|off>` `--enable <id>` `--disable <id>` `--file <file>` `--json <json>` `--dry-run` | Exactly one action flag per call. `--type` is required. A create payload is forwarded to Reqable verbatim, so its field names are Reqable's; `rule list --type <t>` shows the shape of the rules already there. Creating or deleting a rule needs a signed-in Reqable account: an install without one answers "requires an account" and the call exits 4, so report that limit instead of retrying or hunting for a flag that fixes it. The feature switches and listing work without an account. |
+| `rule set` | Enable, disable or create a rule, or toggle a whole rule feature. | `--type <breakpoint\|rewrite\|script>*` `--feature <on\|off>` `--enable <id>` `--disable <id>` `--file <file>` `--payload <json>` `--dry-run` | Exactly one action flag per call. `--type` is required. A create payload is forwarded to Reqable verbatim, so its field names are Reqable's; `rule list --type <t>` shows the shape of the rules already there. Creating or deleting a rule needs a signed-in Reqable account: an install without one answers "requires an account" and the call exits 4, so report that limit instead of retrying or hunting for a flag that fixes it. The feature switches and listing work without an account. |
 
 Parameter marks: `<x>` required positional, `--flag` optional flag, `--flag*` required flag, `a | b` alternatives.
 
@@ -165,7 +165,7 @@ Branch on the exit code, not on the message text. The codes you will meet most:
 | Exit | `error.code` | Action |
 |---|---|---|
 | 0 | (none) | Success. Read `data`. |
-| 2 | `USAGE` | The invocation is wrong: an unknown flag, a missing positional, or bad JSON for `--json`. Fix the command; read `reqable-cli <command> --help`. |
+| 2 | `USAGE` | The invocation is wrong: an unknown flag, a missing positional, or bad JSON for `--payload`. Fix the command; read `reqable-cli <command> --help`. |
 | 3 | `REQABLE_UNREACHABLE` | Reqable is not running, or the API port is wrong. Start Reqable, then run `reqable-cli status`. |
 | 4 | `REQABLE_API_ERROR` | Reqable answered with an error, for example a filter payload it rejected. Read `error.details.message`. |
 | 5 | `NOT_FOUND` | No such record, or a file that is not there. Re-list records and take a fresh ID. |

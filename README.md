@@ -11,12 +11,22 @@ This CLI does not re-expose a hundred tools. It exposes ten entry points shaped 
 ## Install
 
 ```sh
-npm link                 # from this directory; puts reqable-cli on PATH
+npm install -g reqable-cli        # from the registry
 reqable-cli --version
-reqable-cli --help
+reqable-cli skill install         # write the bundled agent skill into ~/.agents/skills
+reqable-cli status                # is Reqable reachable, and is capture on
 ```
 
-No runtime dependencies, so no network fetch is needed. Node.js 18 or newer.
+Installing from a checkout instead:
+
+```sh
+npm link                          # from this directory; puts reqable-cli on PATH
+npm test                          # unit checks; needs no Reqable and no network
+```
+
+No runtime dependencies, so no network fetch is needed. **Node.js 20.11 or newer** — `skill install` resolves its own package directory with `import.meta.dirname`, which is `undefined` on 18 and would fail as an internal error. `package.json` declares the same floor in `engines`.
+
+Pick the release that matches your Reqable, when you are on an older one: `npm install -g reqable-cli@reqable-3.2`. See "Publishing and Reqable versions".
 
 Reqable must be installed and running: the API this CLI calls is served by the Reqable application process on the same port as its capture proxy. When Reqable is closed there is nothing to talk to, and the CLI says so instead of pretending.
 
@@ -153,7 +163,7 @@ Every route this CLI calls, extracted from the reqable-mcp-server Dart source. `
 | `/capture/{breakpoint,rewrite,script}/list` | GET | `breakpoint.dart:420`, `rewrite.dart:426`, `script.dart:443` | `rule list` |
 | `/capture/{breakpoint,rewrite,script}/on` and `/off` | POST | `breakpoint.dart:411-412`, `rewrite.dart:417-418`, `script.dart:434-435` | `rule set --feature on\|off` |
 | `/capture/{breakpoint,rewrite,script}/enable` and `/disable` | POST | `breakpoint.dart:429-430`, `rewrite.dart:435-436`, `script.dart:452-453` | `rule set --enable\|--disable` |
-| `/capture/{breakpoint,rewrite,script}/create` | POST | `breakpoint.dart:448`, `rewrite.dart:454`, `script.dart:471` | `rule set --file\|--json` |
+| `/capture/{breakpoint,rewrite,script}/create` | POST | `breakpoint.dart:448`, `rewrite.dart:454`, `script.dart:471` | `rule set --file\|--payload` |
 
 Three facts about this API that shaped the code:
 
@@ -167,7 +177,16 @@ Deliberately not exposed, with reasons in `docs/endpoints.md`: `/proxy/set` (it 
 
 `SKILL.md` is the entry point an agent loads, with `references/install-and-config.md` and `references/errors.md` for the rare paths. Chinese translations sit beside each file. The skill is self-contained: it names only the installed `reqable-cli` command and its own reference files, so it can be installed anywhere the CLI is.
 
-Installing it as a skill means placing these at a skill path named `reqable-cli`:
+`reqable-cli skill install` writes the six files to a skill directory, `~/.agents/skills/reqable-cli` by default. It reads them from inside the installed package, so it does not care where you ran it from, and it refuses to replace an existing install without `--force`:
+
+```sh
+reqable-cli skill install --dry-run            # where it would write, and which files
+reqable-cli skill install                      # ~/.agents/skills/reqable-cli
+reqable-cli skill install --dir ./skills       # somewhere else
+reqable-cli skill install --force              # replace; the target directory is removed first
+```
+
+The layout it produces:
 
 ```
 reqable-cli/
@@ -179,14 +198,22 @@ reqable-cli/
   references/errors-zh.md
 ```
 
+Installing the skill is a setup action, not part of the traffic interface: an agent mid-task never calls it. It is the one entry point that does not talk to Reqable at all, and it takes none of the transport flags.
+
 ## Verification
 
 ```sh
+npm test                     # unit checks; no Reqable, no network, 27 checks
+
 node test/e2e.mjs            # the main path, 43 checks
 node test/e2e.mjs --keep     # same, and keep the sample HAR for inspection
 
 node test/e2e-extra.mjs      # the paths the main check leaves out, 49 checks
+
+npm run check                # all three, in order
 ```
+
+`npm test` is the one that runs anywhere: it covers the port discovery rule against fixtures, the version-line constants, argument parsing, and — by spawning the CLI — that a rejected `--api-port` still prints one JSON object and exits 2 rather than a stack trace. The two `e2e` scripts need Reqable running.
 
 `test/e2e.mjs` starts its own loopback HTTP target, turns capture on, pushes traffic through Reqable's proxy with a process-level `HTTP_PROXY`, then exercises list, get, curl, HAR export, both replay transports, the error paths and every help screen.
 
@@ -222,11 +249,45 @@ src/commands/status.js    status
 src/commands/capture.js   capture list, get, curl, export, clear, on, off
 src/commands/replay.js    replay
 src/commands/rule.js      rule list, rule set
+src/commands/skill.js     skill install, for setup only
+test/unit.test.mjs        unit checks that need no Reqable
 test/e2e.mjs              end-to-end check
+test/e2e-extra.mjs        file output, HTTPS and the rule surface
+scripts/check-version-line.mjs   guards the branch and Reqable-line pairing
 docs/endpoints.md         endpoint record with source citations and hashes
 docs/verification.md      verification record and route decision
 SKILL.md                  the agent-facing skill
 ```
+
+## Publishing and Reqable versions
+
+Reqable's local API is undocumented and it changes between releases. This package therefore publishes one release line per Reqable line, and `main` always tracks the newest one this project supports.
+
+| Branch | What it tracks | npm dist-tag | Install it with |
+| --- | --- | --- | --- |
+| `main` | the newest supported Reqable line | `latest` | `npm i -g reqable-cli` |
+| `reqable-3.2` | frozen at the last build that worked against Reqable 3.2 | `reqable-3.2` | `npm i -g reqable-cli@reqable-3.2` |
+
+When Reqable 3.3 arrives and this CLI is brought up to it, the order is: branch `reqable-3.2` off the last commit that worked, move `main` to 3.3, then publish the frozen line with its own tag (`npm publish --tag reqable-3.2` from that branch). `npm i -g reqable-cli` keeps handing out the newest line, and the older one stays reachable by name.
+
+Two constants carry the pairing, and a test plus a publish-time guard keep them honest:
+
+- `src/reqable.js` exports `SUPPORTED_REQABLE` (`3.2`) and `VERIFIED_REQABLE` (`3.2.23`); `package.json` mirrors them under `reqable`. `npm test` fails if the two disagree.
+- `npm run check:line` fails when a `reqable-<X.Y>` branch carries a different `SUPPORTED_REQABLE`, and skips when HEAD is detached. `prepublishOnly` runs it, so a mismatch cannot be published from the wrong branch.
+
+`prepublishOnly` also runs `npm test`. Neither it nor `check:line` needs Reqable running, so publishing works on a clean machine; the two `e2e` scripts are manual and never run at publish time.
+
+To publish:
+
+```sh
+npm run check:line         # refuse to publish a branch whose line disagrees
+npm test
+npm publish                # or: npm publish --tag reqable-3.2, from that branch
+```
+
+Publishing from a machine whose npm registry is a mirror writes to that mirror, not to registry.npmjs.org — check with `npm config get registry` first, because it fails silently otherwise.
+
+The lines are not the only signal: `reqable-cli status` reads the Reqable version installed locally and reports it next to the supported line, so a user on a release this build was not written against sees it in the first call rather than as a mystery 404 later.
 
 ## Non-goals
 

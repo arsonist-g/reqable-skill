@@ -130,7 +130,7 @@ reqable-cli capture get 42
 | 命令 | 说明 | 参数 | 备注 |
 |---|---|---|---|
 | `rule list` | 列出断点、改写与脚本。 | `--type <all\|breakpoint\|rewrite\|script>` | 默认 `all`。`data.rules` 按类型给出 Reqable 自己的规则对象，`data.counts` 给出总数。 |
-| `rule set` | 启用、停用或新建一条规则，或开关整类规则功能。 | `--type <breakpoint\|rewrite\|script>*` `--feature <on\|off>` `--enable <id>` `--disable <id>` `--file <file>` `--json <json>` `--dry-run` | 每次调用只能给一个动作 flag。`--type` 必填。新建用的载荷会原样转发给 Reqable，因此其字段名是 Reqable 自己的；`rule list --type <t>` 能看到已有规则的形状。**新建或删除规则需要已登录的 Reqable 账号**：未登录的安装会回「requires an account」并以退出码 4 结束，所以请如实上报这个限制，不要重试，也不要去找某个能绕过它的 flag。功能开关与列表在未登录时可用。 |
+| `rule set` | 启用、停用或新建一条规则，或开关整类规则功能。 | `--type <breakpoint\|rewrite\|script>*` `--feature <on\|off>` `--enable <id>` `--disable <id>` `--file <file>` `--payload <json>` `--dry-run` | 每次调用只能给一个动作 flag。`--type` 必填。新建用的载荷会原样转发给 Reqable，因此其字段名是 Reqable 自己的；`rule list --type <t>` 能看到已有规则的形状。**新建或删除规则需要已登录的 Reqable 账号**：未登录的安装会回「requires an account」并以退出码 4 结束，所以请如实上报这个限制，不要重试，也不要去找某个能绕过它的 flag。功能开关与列表在未登录时可用。 |
 
 参数标记：`<x>` 必填位置参数，`--flag` 可选 flag，`--flag*` 必填 flag，`a | b` 互斥选项。
 
@@ -167,7 +167,7 @@ Reqable 的数据模型有自己的标识与编码规则。解读记录之前先
 | 退出码 | `error.code` | 动作 |
 |---|---|---|
 | 0 | （无） | 成功。读 `data`。 |
-| 2 | `USAGE` | 调用本身有错：未知 flag、缺少位置参数、或 `--json` 的 JSON 不合法。修正命令；读 `reqable-cli <command> --help`。 |
+| 2 | `USAGE` | 调用本身有错：未知 flag、缺少位置参数、或 `--payload` 的 JSON 不合法。修正命令；读 `reqable-cli <command> --help`。 |
 | 3 | `REQABLE_UNREACHABLE` | Reqable 未运行，或 API 端口不对。启动 Reqable，然后运行 `reqable-cli status`。 |
 | 4 | `REQABLE_API_ERROR` | Reqable 返回了错误，例如它拒绝了某个筛选载荷。读 `error.details.message`。 |
 | 5 | `NOT_FOUND` | 没有该记录，或文件不存在。重新列出记录并取新的 ID。 |

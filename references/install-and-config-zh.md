@@ -10,23 +10,35 @@
 |---|---|
 | Reqable 桌面端 | 已安装并正在运行，运行在本机或 `--api-host` 指定的主机上。CLI 与 Reqable 应用进程通信，所以那个进程就是服务本身。 |
 | 能抓包的 Reqable 版本 | 抓包是免费功能；CLI 使用的 API 也属于它。 |
-| Node.js | 18 或更高版本，用于运行 CLI。 |
+| Node.js | 20.11 或更高版本。`skill install` 使用 `import.meta.dirname`，更早的 Node 上没有这个属性。 |
 | Reqable 的 CA 证书 | 只有 `https` body 需要它。把证书装入客户端的信任库，并在 Reqable 中开启 SSL 代理；否则 `https` 记录只会显示加密隧道，而不是可读的 body。 |
 
 Reqable 内部的 Python 脚本功能与本 CLI 无关。规则脚本是 Reqable 自身的能力，在应用内运行。
 
-新建或删除拦截规则需要已登录的 Reqable 账号。未登录的安装上，`rule set --file` 与 `rule set --json` 会回「requires an account」并以退出码 4 结束，而 `rule list`、整类功能开关、以及开关已存在的规则都仍可用。请把这条当作授权边界，而不是故障。
+新建或删除拦截规则需要已登录的 Reqable 账号。未登录的安装上，`rule set --file` 与 `rule set --payload` 会回「requires an account」并以退出码 4 结束，而 `rule list`、整类功能开关、以及开关已存在的规则都仍可用。请把这条当作授权边界，而不是故障。
 
 ## 安装
 
-在存放该包的目录中：
+在装有 Node 20.11 或更高版本的机器上，从 registry 安装：
 
 ```sh
-npm link          # 让 reqable-cli 进入 PATH
+npm install -g reqable-cli
 reqable-cli --version
+reqable-cli skill install      # 把 agent 技能写入 ~/.agents/skills
 ```
 
-在同一目录执行 `npm install -g .` 则改为全局安装。CLI 没有运行时依赖，两种方式都不需要联网拉取。
+或者从该包的源码目录安装：
+
+```sh
+npm link                       # 让 reqable-cli 进入 PATH
+npm install -g .               # 或改为全局安装
+```
+
+两种方式在运行时都不需要联网：CLI 没有运行时依赖。
+
+Reqable 版本较旧时要用对应的旧发布线：`npm install -g reqable-cli@reqable-3.2`。`reqable-cli status` 会把查到的 Reqable 版本与本构建支持的发布线并排报出，所以这种不匹配在它变成失败调用之前就能看到。
+
+`skill install` 是安装步骤，不属于流量接口。它把技能从已安装的包里复制到 `~/.agents/skills/reqable-cli`（或 `--dir <path>`），不带 `--force` 时拒绝覆盖，且完全不接触 Reqable。只有在技能尚未安装时，agent 才需要它。
 
 ## 健康检查
 
@@ -39,8 +51,9 @@ reqable-cli status
 | 字段 | 含义 |
 |---|---|
 | `data.reachable` | Reqable 有响应时为 `true`。为 `false` 意味着 Reqable 未运行，或 `--api-port` 指向了别处。 |
-| `data.host`、`data.port`、`data.portSource` | 实际连上的位置。`portSource` 为 `reqable-config` 表示端口来自 Reqable 自身配置，为 `flag` 表示由 `--api-port` 提供，为 `default` 表示两者都没有。 |
+| `data.host`、`data.port`、`data.portSource`、`data.portReason` | 实际连上的位置。`portSource` 为 `reqable-config` 表示端口来自 Reqable 自身配置，为 `flag` 表示由 `--api-port` 提供，为 `default` 表示两者都没有。`portReason` 精确说明是哪一种兜底：`from-config`、`explicit-flag`、`config-unreadable`、`config-not-json`、`config-has-no-proxy-port`、`proxy-port-not-an-integer`、`proxy-port-out-of-range`。配置「读不到」意味着 CLI 找的位置不是 Reqable 写入的位置；`proxyPort` 不可用则意味着 Reqable 正跑在一个它没记下来的端口上。 |
 | `data.configPath` | 读取端口所用的 Reqable 配置文件。面对第二个 Reqable 实例时有用。 |
+| `data.reqable` | 本机安装的 Reqable 版本、该版本的读取来源、本构建支持的发布线，以及两者是否一致。 |
 | `data.capture.status` | `active` 或 `inactive`。在它为 `active` 之前不要期待任何记录。 |
 | `data.switches` | 哪些抓包功能已开启：`sslProxying`、`accessControl`、`networkThrottling`、`secondaryProxy`。每项含 `active` 与 Reqable 返回的 profile。 |
 | `data.certificate` | Reqable 存放 CA 材料的位置、根证书是否可读、其 subject、有效期区间，以及是否已过期。 |
@@ -54,6 +67,8 @@ CLI 没有配置文件。每一项设置都是 flag，其中决定连接目标�
 |---|---|---|
 | `--api-host <host>` | `127.0.0.1` | 访问 Reqable API 与抓包代理的主机。只有当 Reqable 跑在另一台机器上时才需要改。 |
 | `--api-port <port>` | Reqable 配置的代理端口，否则 `9000` | 端口。API 与抓包代理共用它，所以这也就是要把客户端指向的代理端口。 |
+
+默认值并不是写死的 `9000`：CLI 会从 Reqable 自身的 `capture_config` 读取 `proxyPort`，所以把 Reqable 换到别的端口后依然可用。`--api-port` 可覆盖它，`status` 会报告实际用的是哪一个。
 
 ## 让流量进入 Reqable
 
