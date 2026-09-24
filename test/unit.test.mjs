@@ -610,3 +610,25 @@ test('REQABLE_CLI_DEBUG prints a stack only when it is actually on', () => {
   assert.equal(JSON.parse(off.stdout).ok, false);
   assert.equal(JSON.parse(on.stdout).ok, false);
 });
+
+test('the declared platform matches what the code and the documents say', () => {
+  // The storage root is a Windows path read from %APPDATA%. Declaring the
+  // platform is what stops npm from installing this on a machine where that
+  // lookup would find nothing and report a port problem instead of a platform
+  // one. macOS and Linux roots were removed rather than guessed at, so nothing
+  // may quietly reintroduce the claim that they are supported.
+  const root = new URL('..', import.meta.url);
+  const pkg = JSON.parse(fs.readFileSync(new URL('package.json', root), 'utf8'));
+  assert.deepEqual(pkg.os, ['win32'], 'package.json must declare the platform this was verified on');
+
+  const source = fs.readFileSync(new URL('src/reqable.js', root), 'utf8');
+  assert.match(source, /%APPDATA%/, 'the storage root should name the Windows location it reads');
+  for (const guess of ['com.reqable.macosx', 'com.reqable.linux']) {
+    assert.ok(!source.includes(guess), `${guess} is an unverified path and must not be back in the code`);
+  }
+
+  for (const relative of ['README.md', 'references/install-and-config.md', 'references/install-and-config-zh.md']) {
+    const text = fs.readFileSync(new URL(relative, root), 'utf8');
+    assert.match(text, /Windows/, `${relative} must state the supported platform`);
+  }
+});

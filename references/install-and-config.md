@@ -6,6 +6,7 @@ Read this when `reqable-cli` is not yet on the machine, when a call cannot reach
 
 | Requirement | Detail |
 |---|---|
+| Platform | Windows. The Reqable data directory is read from `%APPDATA%\Reqable`, a layout verified only there, so `package.json` declares `os: ["win32"]`. The CLI itself is platform neutral apart from that lookup. |
 | Reqable desktop | Installed and running on the machine, or on the host named by `--api-host`. The CLI talks to the Reqable application process, so the process is the service. |
 | A Reqable edition that can capture | Capture is the free feature; the API the CLI uses is part of it. |
 | Node.js | Version 20.11 or newer. `skill install` uses `import.meta.dirname`, which does not exist on earlier Node. |

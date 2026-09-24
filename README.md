@@ -26,6 +26,8 @@ npm test                          # unit checks; needs no Reqable and no network
 
 No runtime dependencies, so no network fetch is needed. **Node.js 20.11 or newer** — `skill install` resolves its own package directory with `import.meta.dirname`, which is `undefined` on 18 and would fail as an internal error. `package.json` declares the same floor in `engines`.
 
+**Windows only.** The port and the Reqable data directory are read from `%APPDATA%\Reqable`, and that layout has been verified nowhere else, so `package.json` declares `os: ["win32"]` and npm refuses to install on macOS or Linux rather than placing a tool that would look in the wrong directory. The skill itself is not Windows-specific.
+
 Pick the release that matches your Reqable, when you are on an older one: `npm install -g reqable-cli@reqable-3.2`. See "Publishing and Reqable versions".
 
 Reqable must be installed and running: the API this CLI calls is served by the Reqable application process on the same port as its capture proxy. When Reqable is closed there is nothing to talk to, and the CLI says so instead of pretending.

@@ -29,22 +29,19 @@ export const DEFAULT_HOST = '127.0.0.1';
 export const DEFAULT_PORT = 9000;
 
 /**
- * Reqable's per-user storage root.
+ * Reqable's per-user storage root — Windows only: `%APPDATA%\Reqable`.
  *
- * Mirrors Storage.rootPath in the Dart source (lib/utils/storage.dart:6-33):
- * Windows uses %APPDATA%\Reqable, macOS uses ~/Library/Application Support/
- * com.reqable.macosx, Linux uses ~/.local/share/com.reqable.linux.
+ * The Dart source this mirrors (lib/utils/storage.dart:6-33) also names a macOS
+ * and a Linux location. Neither has ever been observed from this project, and a
+ * path that has not been verified is not worth guessing at: a wrong one would
+ * send the user to `--api-port` for a problem that is not about the port.
+ * `package.json` declares `os: ["win32"]`, so npm refuses to install elsewhere
+ * instead of placing a tool that would look in the wrong directory.
  */
 export function reqableRoot() {
-  if (process.platform === 'win32') {
-    const appData = process.env.APPDATA;
-    if (appData && appData.length > 0) return path.join(appData, 'Reqable');
-    return path.join(os.homedir(), 'AppData', 'Roaming', 'Reqable');
-  }
-  if (process.platform === 'darwin') {
-    return path.join(os.homedir(), 'Library', 'Application Support', 'com.reqable.macosx');
-  }
-  return path.join(os.homedir(), '.local', 'share', 'com.reqable.linux');
+  const appData = process.env.APPDATA;
+  if (appData && appData.length > 0) return path.join(appData, 'Reqable');
+  return path.join(os.homedir(), 'AppData', 'Roaming', 'Reqable');
 }
 
 /** Path of the config file that holds `proxyPort` (lib/config.dart:_resolveAppPort). */

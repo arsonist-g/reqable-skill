@@ -8,6 +8,7 @@
 
 | 要求 | 说明 |
 |---|---|
+| 平台 | Windows。Reqable 的数据目录取自 `%APPDATA%\Reqable`，这个布局只在 Windows 上核实过，因此 `package.json` 声明 `os: ["win32"]`。除这一处查找外，CLI 本身与平台无关。 |
 | Reqable 桌面端 | 已安装并正在运行，运行在本机或 `--api-host` 指定的主机上。CLI 与 Reqable 应用进程通信，所以那个进程就是服务本身。 |
 | 能抓包的 Reqable 版本 | 抓包是免费功能；CLI 使用的 API 也属于它。 |
 | Node.js | 20.11 或更高版本。`skill install` 使用 `import.meta.dirname`，更早的 Node 上没有这个属性。 |

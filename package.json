@@ -20,6 +20,9 @@
   "engines": {
     "node": ">=20.11.0"
   },
+  "os": [
+    "win32"
+  ],
   "scripts": {
     "test": "node --test test/unit.test.mjs",
     "e2e": "node test/e2e.mjs",
