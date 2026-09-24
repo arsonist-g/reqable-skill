@@ -130,7 +130,7 @@ reqable-cli capture get 42
 | 命令 | 说明 | 参数 | 备注 |
 |---|---|---|---|
 | `rule list` | 列出断点、改写与脚本。 | `--type <all\|breakpoint\|rewrite\|script>` | 默认 `all`。`data.rules` 按类型给出 Reqable 自己的规则对象，`data.counts` 给出总数。 |
-| `rule set` | 启用、停用或新建一条规则，或开关整类规则功能。 | `--type <breakpoint\|rewrite\|script>*` `--feature <on\|off>` `--enable <id>` `--disable <id>` `--file <file>` `--json <json>` `--dry-run` | 每次调用只能给一个动作 flag。`--type` 必填。新建用的载荷会原样转发给 Reqable，因此其字段名是 Reqable 自己的；`rule list --type <t>` 能看到已有规则的形状。 |
+| `rule set` | 启用、停用或新建一条规则，或开关整类规则功能。 | `--type <breakpoint\|rewrite\|script>*` `--feature <on\|off>` `--enable <id>` `--disable <id>` `--file <file>` `--json <json>` `--dry-run` | 每次调用只能给一个动作 flag。`--type` 必填。新建用的载荷会原样转发给 Reqable，因此其字段名是 Reqable 自己的；`rule list --type <t>` 能看到已有规则的形状。**新建或删除规则需要已登录的 Reqable 账号**：未登录的安装会回「requires an account」并以退出码 4 结束，所以请如实上报这个限制，不要重试，也不要去找某个能绕过它的 flag。功能开关与列表在未登录时可用。 |
 
 参数标记：`<x>` 必填位置参数，`--flag` 可选 flag，`--flag*` 必填 flag，`a | b` 互斥选项。
 

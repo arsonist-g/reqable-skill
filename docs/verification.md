@@ -94,11 +94,33 @@ Four things found during implementation that the sketch did not anticipate. Each
 
 One sketch assumption turned out to be simply wrong and is worth recording: the initial suspicion that Reqable refuses to proxy loopback targets. It does not. Loopback targets are forwarded and captured normally, for `GET`, `POST` and error responses. The empty replies seen early on came from a test server that had already exited, not from Reqable.
 
+## Supplementary verification: the three paths the first round left out
+
+The first round stopped at three paths because each needed state it was not authorized to touch. They were approved and run in the second round, in `test/e2e-extra.mjs`, 49 checks, all passing. What each one settled:
+
+| Path | Result |
+|---|---|
+| File output: `capture export --format json`, `capture get --out`, `capture get --body-out` | **Verified.** The JSON export is a `{ records: [...] }` document holding Reqable's records unchanged, bodies included. `--out` writes a file whose parsed content equals the record printed on stdout. `--body-out` writes bytes byte-identical to the recorded body (106 bytes, sha256 `f99eb4c6dd151e42` prefix). |
+| `https` target captured through Reqable | **Verified.** A loopback TLS server with a self-signed certificate, requested through the proxy, produced a record whose response body was plain JSON of exactly the expected size, so the TLS really was intercepted. `replay --via reqable --insecure` re-sent that record through the proxy, reached the target (hit count +1) and answered 200. |
+| Rule state changes | **Partly verified, and the rest is now a documented licence gate, not an open question.** The `--feature on|off` switch works for all three rule types, verified through Reqable's own config endpoint. The `{ ids, enabled }` body the CLI sends is accepted by Reqable (200) while a missing or wrongly typed `ids` is rejected (400), which proves the payload shape without needing a rule. Creating or deleting a rule is refused with `401 "requires an account"` on this install, and the CLI surfaces exactly that as exit 4. A live rule therefore cannot be created here without signing in, which is a property of the Reqable edition, not of the CLI. |
+
+Two defects were found and fixed while running these:
+
+| Defect | Why it existed | Fix |
+|---|---|---|
+| `capture export --out -` printed the document and then the envelope, putting two JSON documents on stdout | The stdout branch was written before the single-envelope rule was applied to it | `--out -` is refused with a usage error; stdout stays reserved for the envelope |
+| `replay --via reqable` for an `https` target failed with `socket hang up` | The `CONNECT` request reused the keep-alive socket the same process had used for API calls, so Reqable read it as another API call and hung up. This is the connection-classification trap again, on the tunnel rather than on the request | The `CONNECT` now opens its own connection, and SNI is omitted for IP-literal targets |
+
+One observation that is not a defect: pointing `curl --cacert <Reqable CA>` at the interception certificate did not satisfy the handshake on this machine, and neither did `replay --via reqable` without `--insecure`; both needed the verification to be waived. That is the expected consequence of a MITM proxy presenting its own certificate, and it is why `--insecure` exists and why the skill says to install the CA in the client's trust store.
+
+Both new checks assert restoration rather than assuming it: rule counts and feature flags return to their starting values, the capture switch returns to its starting state, and Reqable's config file hash is unchanged.
+
 ## What was verified how
 
 | Claim | How it was checked |
 |---|---|
 | The end-to-end path works | `node test/e2e.mjs`, 43 checks, all passing: capture on, traffic pushed through the proxy with a process-level `HTTP_PROXY`, list, get, curl, HAR export, both replay transports, error paths, and help output. |
+| The three paths the first round left out work | `node test/e2e-extra.mjs`, 49 checks, all passing: file output compared byte for byte, an `https` target intercepted with a readable body plus replay through the proxy, and the rule surface. Details in the section above. |
 | The endpoints the CLI calls match the table | Reverse grep: every route literal in `src/reqable.js` appears in `docs/endpoints.md`. |
 | No MCP server is involved | No `mcp-server` or `reqable-mcp` process was running during the test; no MCP client configuration on this machine contains a `reqable` server entry. |
 | Reqable's own settings were left alone | The hash of `%APPDATA%\Reqable\config\capture_config` is identical before and after the work: `698cf27ad1d88b56ac6775ba93e2fdb8`. Capture was returned to `inactive`, which is the state it was in before the work started. |

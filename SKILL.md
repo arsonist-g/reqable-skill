@@ -128,7 +128,7 @@ Rules:
 | Command | Description | Parameters | Notes |
 |---|---|---|---|
 | `rule list` | List breakpoints, rewrites and scripts. | `--type <all\|breakpoint\|rewrite\|script>` | Defaults to `all`. `data.rules` holds Reqable's own rule objects per type, `data.counts` the totals. |
-| `rule set` | Enable, disable or create a rule, or toggle a whole rule feature. | `--type <breakpoint\|rewrite\|script>*` `--feature <on\|off>` `--enable <id>` `--disable <id>` `--file <file>` `--json <json>` `--dry-run` | Exactly one action flag per call. `--type` is required. A create payload is forwarded to Reqable verbatim, so its field names are Reqable's; `rule list --type <t>` shows the shape of the rules already there. |
+| `rule set` | Enable, disable or create a rule, or toggle a whole rule feature. | `--type <breakpoint\|rewrite\|script>*` `--feature <on\|off>` `--enable <id>` `--disable <id>` `--file <file>` `--json <json>` `--dry-run` | Exactly one action flag per call. `--type` is required. A create payload is forwarded to Reqable verbatim, so its field names are Reqable's; `rule list --type <t>` shows the shape of the rules already there. Creating or deleting a rule needs a signed-in Reqable account: an install without one answers "requires an account" and the call exits 4, so report that limit instead of retrying or hunting for a flag that fixes it. The feature switches and listing work without an account. |
 
 Parameter marks: `<x>` required positional, `--flag` optional flag, `--flag*` required flag, `a | b` alternatives.
 

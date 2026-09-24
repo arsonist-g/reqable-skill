@@ -55,7 +55,7 @@ Filter flags, shared by `capture list` and `capture export`: `--host`, `--url`, 
 
 ## Output contract
 
-Every command prints exactly one JSON object on stdout, and nothing else. Diagnostics stay off stdout unless `REQABLE_CLI_DEBUG=1`, which sends a stack trace to stderr.
+Every command prints exactly one JSON object on stdout, and nothing else. Diagnostics stay off stdout unless `REQABLE_CLI_DEBUG=1`, which sends a stack trace to stderr. Because stdout is reserved for that envelope, `capture export --out -` is refused: two JSON documents on one stream is not parseable. Give `--out` a real file.
 
 ```json
 {"ok":true,"command":"capture list","data":{"ids":[7],"items":[...]},"meta":{"durationMs":14}}
@@ -129,6 +129,8 @@ Two consequences worth knowing:
 
 `*` marks required. Run `reqable-cli rule list --type <t>` to see the shape of the rules already in your Reqable, which is the most reliable reference.
 
+Creating or deleting a rule needs a signed-in Reqable account. Without one, `create` and `delete` answer `401` with `"Creating <type> requires an account, please login to your Reqable account."`, which the CLI surfaces as exit 4 with that message. Listing, the `--feature` switches, and the `{ ids, enabled }` toggle body all work without an account, and Reqable's own validation of that body is what the supplementary check asserts.
+
 Toggling is different: `rule set --enable <id>` and `--disable <id>` send `{ ids: [...], enabled }` to `/capture/<type>/enable|disable`, mirroring what Reqable's own MCP tool sends.
 
 ## Local API endpoints
@@ -180,13 +182,19 @@ reqable-cli/
 ## Verification
 
 ```sh
-node test/e2e.mjs            # full path, 43 checks
+node test/e2e.mjs            # the main path, 43 checks
 node test/e2e.mjs --keep     # same, and keep the sample HAR for inspection
+
+node test/e2e-extra.mjs      # the paths the main check leaves out, 49 checks
 ```
 
-The end-to-end script starts its own loopback HTTP target, turns capture on, pushes traffic through Reqable's proxy with a process-level `HTTP_PROXY`, then exercises list, get, curl, HAR export, both replay transports, the error paths and every help screen. It restores the capture state it found. No third-party host is contacted.
+`test/e2e.mjs` starts its own loopback HTTP target, turns capture on, pushes traffic through Reqable's proxy with a process-level `HTTP_PROXY`, then exercises list, get, curl, HAR export, both replay transports, the error paths and every help screen.
 
-`docs/verification.md` records the answers to the six open questions this project started with, the route decision, and the findings that changed the plan. Every claim there carries a citation or a quoted command output.
+`test/e2e-extra.mjs` covers what the main check deliberately avoids: the file output paths (`--format json`, `--out`, `--body-out`, compared byte for byte), an `https` target intercepted by Reqable with a readable decrypted body and replayed through the proxy with and without `--insecure`, and the rule surface. It mints a short-lived self-signed certificate with `openssl` for its TLS target.
+
+Both scripts restore what they touched and then assert it: rule counts, rule feature flags, the capture switch, and the hash of Reqable's config file. No third-party host is contacted.
+
+`docs/verification.md` records the answers to the six open questions this project started with, the route decision, the findings that changed the plan, and the results of both scripts.
 
 ## Repository hygiene
 

@@ -28,7 +28,7 @@ Branch on `error.code` first, and on the process exit status when you are drivin
 |---|---|
 | `USAGE` | Read `reqable-cli <command> --help` and rebuild the command. `details` is usually absent, and the message names the offending flag or argument. |
 | `REQABLE_UNREACHABLE` | Run `reqable-cli status`. If `data.reachable` is `false`, start Reqable. Adjust `--api-port` only when you know Reqable is listening on another port. See `install-and-config.md`. |
-| `REQABLE_API_ERROR` | Read `error.details.message`. A filter Reqable rejected means one of the filter values is not in the shape it expects. A 500 from Reqable is worth one retry, then report it. |
+| `REQABLE_API_ERROR` | Read `error.details.message`. A filter Reqable rejected means one of the filter values is not in the shape it expects. A 401 whose message says something "requires an account" is a licence limit on creating or deleting a rule, not a defect: report it, do not retry, and do not look for a flag that bypasses it. A 500 from Reqable is worth one retry, then report it. |
 | `NOT_FOUND` | The ID was wrong or the record was cleared between the list call and this one. Run `capture list` again and use an ID from that result. |
 | `CONFIRMATION_REQUIRED` | For `capture clear`, re-run with `--yes`. There is no other command behind this code. |
 | `INTERNAL_ERROR` | Nothing to retry. Capture the invocation, the `error.message`, `error.details.name`, and the output of `REQABLE_CLI_DEBUG=1 reqable-cli ...`. |

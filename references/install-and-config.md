@@ -13,6 +13,8 @@ Read this when `reqable-cli` is not yet on the machine, when a call cannot reach
 
 Python scripting inside Reqable is unrelated to this CLI. Rule scripts are Reqable's own feature and run inside the application.
 
+Creating or deleting an interception rule needs a signed-in Reqable account. On an install without one, `rule set --file` and `rule set --json` answer "requires an account" and exit 4, while `rule list`, the feature switches, and toggling a rule that already exists keep working. Treat that as a licence boundary rather than a fault.
+
 ## Install
 
 From the directory that holds the package:

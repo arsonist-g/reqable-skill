@@ -30,7 +30,7 @@
 |---|---|
 | `USAGE` | 读 `reqable-cli <command> --help` 并重建命令。`details` 通常不存在，消息里会点出出错的 flag 或参数。 |
 | `REQABLE_UNREACHABLE` | 运行 `reqable-cli status`。若 `data.reachable` 为 `false`，启动 Reqable。只有在你确知 Reqable 监听在其他端口时才调整 `--api-port`。见 `install-and-config.md`。 |
-| `REQABLE_API_ERROR` | 读 `error.details.message`。Reqable 拒绝某个筛选，说明该筛选的取值不是它期望的形状。Reqable 返回 500 时值得重试一次，然后如实上报。 |
+| `REQABLE_API_ERROR` | 读 `error.details.message`。Reqable 拒绝某个筛选，说明该筛选的取值不是它期望的形状。若返回 401 且消息里含「requires an account」，那是新建或删除规则的账号/授权限制，不是缺陷：如实上报，不要重试，也不要去找绕过它的 flag。Reqable 返回 500 时值得重试一次，然后如实上报。 |
 | `NOT_FOUND` | ID 不对，或记录在列表调用与本次调用之间被清掉了。重新运行 `capture list` 并使用该结果中的 ID。 |
 | `CONFIRMATION_REQUIRED` | 对 `capture clear` 而言，带 `--yes` 重跑。没有第二个命令会在这种码后面。 |
 | `INTERNAL_ERROR` | 没有可重试的动作。记录下调用方式、`error.message`、`error.details.name`，以及 `REQABLE_CLI_DEBUG=1 reqable-cli ...` 的输出。 |

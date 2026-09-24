@@ -15,6 +15,8 @@
 
 Reqable 内部的 Python 脚本功能与本 CLI 无关。规则脚本是 Reqable 自身的能力，在应用内运行。
 
+新建或删除拦截规则需要已登录的 Reqable 账号。未登录的安装上，`rule set --file` 与 `rule set --json` 会回「requires an account」并以退出码 4 结束，而 `rule list`、整类功能开关、以及开关已存在的规则都仍可用。请把这条当作授权边界，而不是故障。
+
 ## 安装
 
 在存放该包的目录中：
