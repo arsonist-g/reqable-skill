@@ -2,7 +2,7 @@
 
 ---
 name: reqable-cli
-description: 从命令行查看抓到的 HTTP 流量、把一次抓包会话导出为 HAR、重放某条已捕获的请求，以及开关 Reqable 的断点、改写与脚本。触发场景包括：弄清某个应用向某个 API 发送了什么、按 host/方法/状态码/关键字筛选抓包结果、完整取出某条请求与响应（含 body）、导出一次会话交给别人打开、重发一条已捕获的请求、为某个 URL 新增或停用一条 Reqable 拦截规则。它驱动 `reqable-cli` 命令，该命令直接与 Reqable 自身的本地抓包 API 通信，不涉及任何 MCP 服务器。
+description: reqable-cli 是 Reqable（桌面端 HTTP 调试代理）的命令行前端。它直接与 Reqable 自身的本地抓包 API 通信，用于从命令行查看抓到的 HTTP 流量、把一次抓包会话导出为 HAR、重放某条已捕获的请求，以及开关 Reqable 的断点、改写与脚本。触发场景包括：弄清某个应用向某个 API 发送了什么、按 host/方法/状态码/关键字筛选抓包结果、完整取出某条请求与响应（含 body）、导出一次会话交给别人打开、重发一条已捕获的请求、为某个 URL 新增或停用一条 Reqable 拦截规则。
 ---
 
 # reqable-cli：处理抓到的 HTTP 流量

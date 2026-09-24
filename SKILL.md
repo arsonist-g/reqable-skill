@@ -1,6 +1,6 @@
 ---
 name: reqable-cli
-description: Inspect captured HTTP traffic, export a capture session to HAR, replay a captured request, and switch Reqable breakpoints, rewrites and scripts on and off from a shell. Triggers on finding out what an application sent to an API, filtering a capture by host, method, status code or keyword, pulling one request and response out with their bodies, exporting a session for someone else to open, re-sending a captured request, and adding or disabling a Reqable interception rule. It drives the reqable-cli command, which speaks to Reqable's own local capture API, so no MCP server is involved.
+description: reqable-cli is a command-line front end for Reqable, the desktop HTTP debugging proxy. It speaks to Reqable's own local capture API to inspect captured HTTP traffic, export a capture session to HAR, replay a captured request, and switch Reqable breakpoints, rewrites and scripts on and off from a shell. Triggers on finding out what an application sent to an API, filtering a capture by host, method, status code or keyword, pulling one request and response out with their bodies, exporting a session for someone else to open, re-sending a captured request, and adding or disabling a Reqable interception rule.
 ---
 
 # reqable-cli: work with captured HTTP traffic
