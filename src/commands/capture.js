@@ -261,7 +261,10 @@ const exportHelp = {
     { name: '--pretty', description: 'Indent the JSON output.' },
     { name: '--help', description: 'Show this help and exit 0.' },
   ],
-  notes: `HAR timings are reported as -1 in every phase: Reqable's local API exposes no
+  notes: `The filter flags choose what goes into the file, and --limit truncates without
+saying so: pass --limit 0 when the file must hold every match.
+
+HAR timings are reported as -1 in every phase: Reqable's local API exposes no
 per-phase timing for a live record, and -1 is HAR 1.2's value for "unavailable".
 Bodies are inlined; binary bodies use HAR's base64 content encoding.`,
   examples: [

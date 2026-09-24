@@ -336,7 +336,7 @@ export const replayHelp = {
   options: [
     { name: '--via <t>', description: 'Transport. direct = straight to the origin; reqable = through Reqable\'s proxy so the replay is captured again.', values: ['direct', 'reqable'], default: 'direct' },
     { name: '--proxy <url>', description: 'Proxy URL. Defaults to Reqable\'s own proxy when --via reqable.' },
-    { name: '--header <h>', description: 'Override or add a header as "Name: value". Repeatable.' },
+    { name: '--header <h>', description: 'Set a header as "Name: value". Repeatable, and a header of the same name is replaced rather than duplicated.' },
     { name: '--method <m>', description: 'Override the HTTP method.' },
     { name: '--url <url>', description: 'Send to a different URL. Nothing is rewritten implicitly.' },
     { name: '--body <text>', description: 'Replace the request body with this text.' },

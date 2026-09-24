@@ -117,13 +117,13 @@ reqable-cli capture get 42
 | `capture list` | 列出抓到的请求，可选筛选。 | `--limit <n>` `--sort <newest\|oldest>` `--ids-only` | `--limit` 默认 50，`0` 表示不限制。返回的 `data.items[]` 含 `id`、`uid`、`protocol`、`url`、`host`、`path`、`method`、`statusCode`、`statusText`、`responseMime`、`requestBodyBytes`、`responseBodyBytes`、`application`、`startedAt`、`remote`。加 `--ids-only` 时只填 `data.ids`，调用代价低得多。 |
 | `capture get <id>` | 取出某条记录及其完整的请求、响应与 body。 | `<id>` `--out <file>` `--body-out <file>` | `data.record` 是原始记录。`--body-out` 把响应 body 解码为原始字节写入文件。 |
 | `capture curl <id>` | 生成可复现该请求的 cURL 命令。 | `<id>` | `data.curl` 是 Reqable 自己给出的文本，使用 Windows cmd 的换行续行符；`data.curlSingleLine` 是同一命令合并成的一行 POSIX 形式。 |
-| `capture export` | 把记录写入 HAR 1.2 文件或原始 JSON 文件。 | `--out <file>*` `--format <har\|json>` `--limit <n>` `--sort <s>` | `--format` 默认 `har`，`--limit` 默认 50。`--out` 必填；`--out -` 把文档写到标准输出。结果报告 `data.writtenTo` 与 `data.bytes`。 |
+| `capture export` | 把记录写入 HAR 1.2 文件或原始 JSON 文件。 | `--out <file>*` `--format <har\|json>` `--limit <n>` `--sort <s>` | `--format` 默认 `har`，`--limit` 默认 50。`--out` 必填；`--out -` 把文档写到标准输出。筛选 flag 决定哪些记录进入文件，而 `--limit` 会静默截断，所以要求文件包含全部命中项时必须传 `--limit 0`。结果报告 `data.writtenTo` 与 `data.bytes`。 |
 
 发送流量：
 
 | 命令 | 说明 | 参数 | 备注 |
 |---|---|---|---|
-| `replay <id>` | 重发一条已捕获的请求并报告响应。 | `<id>` `--via <direct\|reqable>` `--proxy <url>` `--header <h>` `--method <m>` `--url <u>` `--body <text>` `--timeout <ms>` `--max-body <bytes>` `--full` `--insecure` `--dry-run` | `--via` 默认 `direct`，直接请求源站。`--via reqable` 经 Reqable 代理发出，从而让这次重放被再次捕获；目标是 `https` 时需要 `--insecure`，因为 Reqable 用自己的证书做了中间人。`--dry-run` 只报告将要发出的请求而不发送。Host、content-length、connection、transfer-encoding 来自记录中的请求或被重建。 |
+| `replay <id>` | 重发一条已捕获的请求并报告响应。 | `<id>` `--via <direct\|reqable>` `--proxy <url>` `--header <h>` `--method <m>` `--url <u>` `--body <text>` `--timeout <ms>` `--max-body <bytes>` `--full` `--insecure` `--dry-run` | `--via` 默认 `direct`，直接请求源站。`--via reqable` 经 Reqable 代理发出，从而让这次重放被再次捕获；目标是 `https` 时需要 `--insecure`，因为 Reqable 用自己的证书做了中间人。`--dry-run` 只报告将要发出的请求而不发送。`--header` 可重复，且会替换同名 header，因此它是替换凭据而不是追加第二条。`--max-body` 默认 8192 字节；`--full` 返回完整 body。Host、content-length、connection、transfer-encoding 来自记录中的请求或被重建。 |
 
 规则：
 
