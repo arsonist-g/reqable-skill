@@ -194,7 +194,11 @@ function sendDirect(plan, values, timeoutMs) {
   const options = {
     method: plan.method,
     protocol: target.protocol,
-    hostname: target.hostname,
+    // bareHost, because a URL keeps the brackets around an IPv6 literal and
+    // http.request hands `hostname` straight to getaddrinfo, which then fails
+    // with ENOTFOUND for `[::1]`. Node strips the brackets itself in
+    // urlToHttpOptions; this code builds the options by hand, so it must too.
+    hostname: bareHost(target.hostname),
     port: target.port || (isHttps ? 443 : 80),
     path: `${target.pathname}${target.search}`,
     headers: headerObject(plan.headers),
@@ -228,7 +232,7 @@ function sendViaProxy(plan, values, timeoutMs) {
       http,
       {
         method: plan.method,
-        host: proxy.hostname,
+        host: bareHost(proxy.hostname),
         port: Number(proxy.port || 80),
         path: plan.url,
         headers,
@@ -247,7 +251,7 @@ function sendViaProxy(plan, values, timeoutMs) {
   const agent = new https.Agent({ keepAlive: false, maxSockets: 1 });
   agent.createConnection = (options, callback) => {
     const connectReq = http.request({
-      host: proxy.hostname,
+      host: bareHost(proxy.hostname),
       port: Number(proxy.port || 80),
       method: 'CONNECT',
       path: `${target.hostname}:${target.port || 443}`,
@@ -291,7 +295,7 @@ function sendViaProxy(plan, values, timeoutMs) {
     https,
     {
       method: plan.method,
-      host: target.hostname,
+      host: bareHost(target.hostname),
       port: Number(target.port || 443),
       path: `${target.pathname}${target.search}`,
       headers,
@@ -323,7 +327,7 @@ function perform(mod, options, body, timeoutMs) {
       reject(
         apiError(`Replay failed: ${error.message}`, {
           code: error.code,
-          target: `${options.host ?? options.hostname}:${options.port}`,
+          target: formatHostPort(bareHost(options.host ?? options.hostname ?? ''), options.port),
         }, error),
       );
     });

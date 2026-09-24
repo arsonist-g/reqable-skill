@@ -492,3 +492,121 @@ test('the documented Node floor matches package.json engines', () => {
     assert.equal(stale, null, `${relative} still advertises an older Node: ${stale?.[0]}`);
   }
 });
+
+test('--force replaces a link at the target without touching what it points to', (t) => {
+  // The forced branch removes <dir>/reqable-cli before writing. If it ever
+  // followed a link instead of removing it, `skill install --force` could empty
+  // a directory the caller never named. It removes the link; this pins that.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reqable-cli-link-'));
+  const real = path.join(dir, 'real-target');
+  fs.mkdirSync(real);
+  fs.writeFileSync(path.join(real, 'keepme.txt'), 'precious');
+
+  const link = path.join(dir, 'reqable-cli');
+  try {
+    fs.symlinkSync(real, link, process.platform === 'win32' ? 'junction' : 'dir');
+  } catch {
+    t.skip('this platform or account cannot create links');
+    return;
+  }
+
+  const cli = fileURLToPath(new URL('../bin/reqable-cli.js', import.meta.url));
+  const stdout = execFileSync(process.execPath, [cli, 'skill', 'install', '--dir', dir, '--force'], {
+    encoding: 'utf8',
+  });
+
+  assert.equal(JSON.parse(stdout).ok, true, 'the forced install should report success');
+  assert.ok(fs.existsSync(path.join(real, 'keepme.txt')), 'what the link pointed at must survive');
+  assert.ok(!fs.lstatSync(link).isSymbolicLink(), 'the target must end up a real directory, not a link');
+  assert.ok(fs.existsSync(path.join(link, 'SKILL.md')), 'the install should have written the skill there');
+});
+
+// ------------------------------------------------- skill install input handling
+
+/** Run the CLI and always return its exit code, stdout and stderr. */
+function runCli(argv, env = {}) {
+  const cli = fileURLToPath(new URL('../bin/reqable-cli.js', import.meta.url));
+  try {
+    const stdout = execFileSync(process.execPath, [cli, ...argv], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, ...env },
+    });
+    return { status: 0, stdout, stderr: '' };
+  } catch (error) {
+    return { status: error.status, stdout: error.stdout ?? '', stderr: error.stderr ?? '' };
+  }
+}
+
+test('skill install reports an unusable --dir as a usage error, not an internal one', () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'reqable-cli-dir-'));
+  const aFile = path.join(workspace, 'a-file');
+  fs.writeFileSync(aFile, 'not a directory');
+
+  // Each of these used to reach mkdirSync and surface as INTERNAL_ERROR with
+  // exit 1 -- the code reserved for "this is a bug, report it". None of them is.
+  const cases = [
+    [['--dir', aFile], /which is a file/],
+    [['--dir=', ], /empty value/],
+    [['--dir', path.join(aFile, 'under-a-file')], /ENOTDIR|cannot be used/],
+  ];
+  for (const [args, expected] of cases) {
+    const result = runCli(['skill', 'install', ...args]);
+    const label = `skill install ${args.join(' ')}`;
+    assert.equal(result.status, EXIT.USAGE, `${label} should exit 2, got ${result.status}`);
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.error.code, 'USAGE');
+    assert.match(parsed.error.message, expected);
+  }
+});
+
+test('skill install takes a linked --dir, and refuses a file at the target', (t) => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'reqable-cli-dirlink-'));
+  const realSkills = path.join(workspace, 'real-skills');
+  fs.mkdirSync(realSkills);
+  const linked = path.join(workspace, 'linked-skills');
+  try {
+    fs.symlinkSync(realSkills, linked, process.platform === 'win32' ? 'junction' : 'dir');
+  } catch {
+    t.skip('this platform or account cannot create links');
+    return;
+  }
+
+  // A skills directory kept in a dotfiles repository is a symlink, so an lstat
+  // check here would reject a layout that works.
+  const installed = runCli(['skill', 'install', '--dir', linked]);
+  assert.equal(installed.status, 0, installed.stdout);
+  assert.ok(fs.existsSync(path.join(realSkills, 'reqable-cli', 'SKILL.md')), 'the skill should land behind the link');
+
+  // A regular file sitting where the skill directory belongs is a confirmation
+  // case, not a crash: exit 6 without --force, and a clean install with it.
+  const blocked = path.join(workspace, 'blocked');
+  fs.mkdirSync(blocked);
+  fs.writeFileSync(path.join(blocked, 'reqable-cli'), 'a file in the way');
+  const refused = runCli(['skill', 'install', '--dir', blocked]);
+  assert.equal(refused.status, EXIT.CONFIRMATION_REQUIRED);
+  assert.equal(JSON.parse(refused.stdout).error.code, 'CONFIRMATION_REQUIRED');
+  assert.match(JSON.parse(refused.stdout).error.message, /already exists as a file/);
+
+  const forced = runCli(['skill', 'install', '--dir', blocked, '--force']);
+  assert.equal(forced.status, 0, forced.stdout);
+  assert.ok(fs.statSync(path.join(blocked, 'reqable-cli')).isDirectory());
+});
+
+test('REQABLE_CLI_DEBUG prints a stack only when it is actually on', () => {
+  // `=0` is how a caller turns it off in a shell that already exported it, and a
+  // truthy test read that as "on".
+  const argv = ['status', '--api-host', '[::1]'];
+
+  const off = runCli(argv, { REQABLE_CLI_DEBUG: '0' });
+  assert.equal(off.status, EXIT.USAGE);
+  assert.equal(off.stderr, '', 'REQABLE_CLI_DEBUG=0 must stay quiet');
+
+  const on = runCli(argv, { REQABLE_CLI_DEBUG: '1' });
+  assert.equal(on.status, EXIT.USAGE);
+  assert.match(on.stderr, /CliError/, 'REQABLE_CLI_DEBUG=1 should print the stack to stderr');
+  // Either way stdout stays one JSON object: diagnostics never go there.
+  assert.equal(JSON.parse(off.stdout).ok, false);
+  assert.equal(JSON.parse(on.stdout).ok, false);
+});

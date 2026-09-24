@@ -76,7 +76,7 @@ Stable `data` fields per command:
 
 | Command | `data` fields |
 |---|---|
-| `status` | `reachable`, `host`, `port`, `portSource`, `configPath`, `capture.status`, `switches.{sslProxying,accessControl,networkThrottling,secondaryProxy}`, `certificate`, `errors`, `hint` |
+| `status` | `reachable`, `host`, `port`, `portSource`, `portReason`, `configPath`, `reqable.{version,source,supported,verifiedWith,lineMatches}`, `capture.status`, `switches.{sslProxying,accessControl,networkThrottling,secondaryProxy}`, `certificate`, `errors`, `hint` |
 | `capture list` | `filters`, `filterSummary`, `totalMatched`, `returned`, `ids`, `items[]`, `mode`, and `hint` when nothing matched |
 | `capture list` `items[]` | `id`, `uid`, `protocol`, `url`, `host`, `path`, `method`, `statusCode`, `statusText`, `responseMime`, `requestBodyBytes`, `responseBodyBytes`, `application`, `startedAt`, `remote` |
 | `capture get` | `id`, `record`, plus `savedRecordTo` / `savedResponseBodyTo` when asked to write files |

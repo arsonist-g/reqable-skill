@@ -39,15 +39,30 @@ function defaultSkillsDir() {
   return path.join(os.homedir(), '.agents', 'skills');
 }
 
-/** 'absent' | 'file' | 'directory' | 'other' — what is actually at a path. */
-function pathKind(target) {
+/**
+ * What is at a path: `{ kind: 'absent'|'directory'|'file'|'other', error?: string }`.
+ *
+ * `follow` decides between stat and lstat, and the two callers need opposite
+ * answers. A skills directory kept in a dotfiles repository is normally a
+ * symlink, so `--dir` must be inspected with `statSync` — refusing one because
+ * "it is not a directory" would be wrong and would reject a layout that used to
+ * work. The target path is inspected with `lstatSync`, where a link must be seen
+ * as itself so it can be replaced rather than descended into.
+ *
+ * `error` carries the errno when the path could not be inspected at all
+ * (ENOTDIR, EACCES, ELOOP), which the previous catch-all reported as `absent`.
+ * That is the difference between "nothing is there yet" and "you pointed at
+ * something unusable", and only one of them is safe to write to.
+ */
+function inspectPath(target, { follow = true } = {}) {
   try {
-    const stat = fs.lstatSync(target);
-    if (stat.isDirectory()) return 'directory';
-    if (stat.isFile()) return 'file';
-    return 'other';
-  } catch {
-    return 'absent';
+    const stat = (follow ? fs.statSync : fs.lstatSync)(target);
+    if (stat.isDirectory()) return { kind: 'directory' };
+    if (stat.isFile()) return { kind: 'file' };
+    return { kind: 'other' };
+  } catch (error) {
+    if (error.code === 'ENOENT') return { kind: 'absent' };
+    return { kind: 'absent', error: error.code ?? error.message };
   }
 }
 
@@ -56,24 +71,54 @@ function packageRoot() {
   return path.resolve(import.meta.dirname, '..', '..');
 }
 
+/** How to name, in a message, the thing standing at the target path. */
+function describeTarget({ kind, error }) {
+  if (error !== undefined) return `an entry that could not be read (${error})`;
+  if (kind === 'directory') return 'a directory';
+  if (kind === 'file') return 'a file';
+  return 'a link or other entry';
+}
+
 export async function skillInstallCommand(values) {
-  const skillsDir = path.resolve(values.dir ?? defaultSkillsDir());
-  const targetDir = path.join(skillsDir, SKILL_NAME);
   const root = packageRoot();
 
-  // A --dir that names a file, or a target path already taken by a file, both
-  // end in a raw EEXIST/ENOTDIR from fs, reported as INTERNAL_ERROR with exit 1.
-  // Neither is an internal bug: they are the caller pointing at the wrong place,
-  // so they get the exit code and the wording that says so.
-  const skillsDirKind = pathKind(skillsDir);
-  if (skillsDirKind === 'file' || skillsDirKind === 'other') {
+  // `--dir=` gives an empty string, which is not nullish, and path.resolve('')
+  // is the current directory. Left alone that silently aims the install -- and,
+  // under --force, the removal -- at ./reqable-cli. An empty value almost always
+  // means the caller meant to omit the flag, so say that instead of guessing.
+  if (values.dir !== undefined && String(values.dir).trim() === '') {
     throw usageError(
-      `--dir points at ${skillsDir}, which is ${skillsDirKind === 'file' ? 'a file' : 'not a directory'}. ` +
+      '--dir was given an empty value. Pass a directory, or omit --dir to install into ' +
+        `${defaultSkillsDir()}.`,
+      { dir: values.dir },
+    );
+  }
+
+  const skillsDir = path.resolve(values.dir ?? defaultSkillsDir());
+  const targetDir = path.join(skillsDir, SKILL_NAME);
+
+  // A --dir that names a file, cannot be inspected, or resolves to something that
+  // is not a directory would otherwise fail deep inside mkdirSync as a raw
+  // EEXIST/ENOTDIR/EACCES reported as INTERNAL_ERROR with exit 1. None of those is
+  // an internal bug: they are the caller naming a path that cannot hold a skill,
+  // so they get the exit code and the wording that says so. Symlinks resolve here
+  // on purpose -- a skills directory kept in a dotfiles repository is a symlink.
+  const dirInfo = inspectPath(skillsDir);
+  const dirProblem =
+    dirInfo.error !== undefined
+      ? `cannot be used as a skills directory (${dirInfo.error})`
+      : dirInfo.kind === 'file'
+        ? 'is a file'
+        : dirInfo.kind === 'other'
+          ? 'is not a directory'
+          : null;
+  if (dirProblem !== null) {
+    throw usageError(
+      `--dir points at ${skillsDir}, which ${dirProblem}. ` +
         `Pass a directory that can hold a ${SKILL_NAME} subdirectory, or omit --dir to use ${defaultSkillsDir()}.`,
       { skillsDir },
     );
   }
-
 
   // Read every source file before touching the target, so a broken package
   // fails without leaving a half-written skill behind.
@@ -97,11 +142,12 @@ export async function skillInstallCommand(values) {
     );
   }
 
-  // lstat, not existsSync: a target that is a regular file behaves differently
-  // from a directory (mkdir hits EEXIST), and the report should name which one
-  // is in the way instead of leaving the caller to guess.
-  const targetKind = pathKind(targetDir);
-  const existing = targetKind !== 'absent';
+  // lstat here, not stat: a target that is a link must be seen as itself, both
+  // because the report should name what is actually in the way and because
+  // removing a link is what makes --force safe (see the note at the removal).
+  const targetInfo = inspectPath(targetDir, { follow: false });
+  const targetKind = targetInfo.error !== undefined ? targetInfo.error : targetInfo.kind;
+  const existing = targetInfo.kind !== 'absent' || targetInfo.error !== undefined;
   const bytes = payload.reduce((total, file) => total + file.content.length, 0);
 
   if (values['dry-run']) {
@@ -123,20 +169,36 @@ export async function skillInstallCommand(values) {
   // it takes the same explicit acknowledgement as any other destructive command.
   if (existing && !values.force) {
     throw confirmationError(
-      `${targetDir} already exists as ${targetKind === 'directory' ? 'a directory' : 'a file'}. ` +
+      `${targetDir} already exists as ${describeTarget(targetInfo)}. ` +
         'Re-run with --force to replace it, or pass --dir to install somewhere else.',
       { targetDir, skillsDir, targetKind },
     );
   }
 
-  // Removed rather than overwritten in place, so a file left over from an older
-  // version of the skill does not survive an install and keep being read. Only
-  // ever the target subdirectory, and only under --force.
-  if (existing) fs.rmSync(targetDir, { recursive: true, force: true });
+  try {
+    // Removed rather than overwritten in place, so a file left over from an older
+    // version of the skill does not survive an install and keep being read. Only
+    // ever the target subdirectory, and only under --force.
+    //
+    // Verified against a link: when the target is a symlink or a Windows
+    // junction, rmSync removes the link and leaves its target untouched, so a
+    // --force install can never reach outside <skillsDir>/reqable-cli. Do not
+    // "fix" this into following the link.
+    if (existing) fs.rmSync(targetDir, { recursive: true, force: true });
 
-  for (const file of payload) {
-    fs.mkdirSync(path.dirname(file.target), { recursive: true });
-    fs.writeFileSync(file.target, file.content);
+    for (const file of payload) {
+      fs.mkdirSync(path.dirname(file.target), { recursive: true });
+      fs.writeFileSync(file.target, file.content);
+    }
+  } catch (error) {
+    // A path that cannot be written (ENOTDIR, EACCES, ENOSPC, EPERM) is the
+    // caller's chosen location failing, not a bug in this command. Exit 1 is
+    // reserved for "report this", so it is the wrong answer here.
+    throw usageError(
+      `Could not write the skill into ${targetDir} (${error.code ?? error.message}). ` +
+        'Check the path and its permissions, or pass --dir to install somewhere else.',
+      { targetDir, skillsDir, code: error.code },
+    );
   }
 
   return {
