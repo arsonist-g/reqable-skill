@@ -63,7 +63,11 @@ export async function run(command, flags, body) {
       meta: { durationMs: Date.now() - startedAt },
     };
 
-    if (process.env.REQABLE_CLI_DEBUG) {
+    // Explicitly falsy values count as off: `REQABLE_CLI_DEBUG=0` is how a
+    // caller disables it in a shell that already exported it, and a truthy test
+    // would read that as "on".
+    const debugFlag = (process.env.REQABLE_CLI_DEBUG ?? '').trim().toLowerCase();
+    if (debugFlag && !['0', 'false', 'off', 'no'].includes(debugFlag)) {
       process.stderr.write(`${cliError.stack}\n`);
       if (cliError.cause?.stack) process.stderr.write(`caused by: ${cliError.cause.stack}\n`);
     }

@@ -81,7 +81,7 @@ async function setCommand(api, values) {
 
   const actions = [
     values.file !== undefined,
-    values.json !== undefined,
+    values.payload !== undefined,
     values.enable?.length > 0,
     values.disable?.length > 0,
     values.feature !== undefined,
@@ -89,11 +89,11 @@ async function setCommand(api, values) {
 
   if (actions === 0) {
     throw usageError(
-      'Nothing to do. Pass one of --feature on|off, --enable <id>, --disable <id>, --file <json> or --json <json>.',
+      'Nothing to do. Pass one of --feature on|off, --enable <id>, --disable <id>, --file <json> or --payload <json>.',
     );
   }
   if (actions > 1) {
-    throw usageError('--feature, --enable, --disable, --file and --json are mutually exclusive; pass exactly one.');
+    throw usageError('--feature, --enable, --disable, --file and --payload are mutually exclusive; pass exactly one.');
   }
 
   if (values.feature !== undefined) {
@@ -132,7 +132,7 @@ const setHelp = {
     { name: '--enable <id>', description: 'Enable one rule by id. Repeatable.' },
     { name: '--disable <id>', description: 'Disable one rule by id. Repeatable.' },
     { name: '--file <file>', description: 'Create a rule from a JSON file.' },
-    { name: '--json <json>', description: 'Create a rule from inline JSON.' },
+    { name: '--payload <json>', description: 'Create a rule from an inline JSON payload.' },
     { name: '--dry-run', description: 'Report what would be sent without sending it.' },
     { name: '--api-port <p>', description: 'Reqable API port.' },
     { name: '--pretty', description: 'Indent the JSON output.' },
@@ -152,7 +152,7 @@ Reqable's own, listed in README.md under "Rule payloads". Start from
 };
 
 function readPayload(values) {
-  const raw = values.file !== undefined ? readFile(values.file) : values.json;
+  const raw = values.file !== undefined ? readFile(values.file) : values.payload;
   let parsed;
   try {
     parsed = JSON.parse(raw);
@@ -185,7 +185,7 @@ export const ruleSubcommands = {
       enable: { type: 'list' },
       disable: { type: 'list' },
       file: { type: 'string' },
-      json: { type: 'string' },
+      payload: { type: 'string' },
       'dry-run': { type: 'boolean' },
     },
     maxPositionals: 0,

@@ -290,7 +290,7 @@ check('an unknown flag gives exit 2 and a structured error',
   badFlag.code === 2 && badFlag.envelope?.error?.code === 'USAGE',
   badFlag.envelope?.error?.message);
 
-const badJson = await cli(['rule', 'set', '--type', 'rewrite', '--json', '{not json']);
+const badJson = await cli(['rule', 'set', '--type', 'rewrite', '--payload', '{not json']);
 check('malformed rule JSON gives exit 2', badJson.code === 2 && badJson.envelope?.error?.code === 'USAGE',
   badJson.envelope?.error?.message);
 

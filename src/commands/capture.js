@@ -11,7 +11,7 @@
 
 import fs from 'node:fs';
 
-import { confirmationError, usageError } from '../errors.js';
+import { confirmationError, notFoundError, usageError } from '../errors.js';
 import { buildFilters, describeFilters, filterFlags } from '../filters.js';
 import { curlToSingleLine, harDocument, summarize } from '../records.js';
 
@@ -34,27 +34,48 @@ const DEFAULT_LIMIT = 50;
 async function selectIds(api, values) {
   const filters = buildFilters(values);
   const ids = await api.filterRecords(filters);
+  if (values.sort !== undefined && values.sort !== 'newest' && values.sort !== 'oldest') {
+    throw usageError('--sort expects "newest" or "oldest".');
+  }
   const sort = values.sort ?? 'newest';
   const sorted = [...ids].sort((a, b) => (sort === 'oldest' ? a - b : b - a));
+
   const limit = values.limit === undefined ? DEFAULT_LIMIT : Number(values.limit);
+  if (!Number.isInteger(limit) || limit < 0) {
+    throw usageError('--limit expects a non-negative whole number; 0 means no limit.');
+  }
   const limited = limit > 0 ? sorted.slice(0, limit) : sorted;
   return { filters, ids: limited, total: sorted.length };
 }
 
-/** Fetch full records for a list of IDs, in order. */
+/**
+ * Fetch full records for a list of IDs, preserving order.
+ *
+ * Reqable's filter returns IDs only, so a list of N records costs N+1 calls. They
+ * run with bounded concurrency: sequentially, a large capture would make a list
+ * call take minutes, and unbounded, it would open a connection per record.
+ */
 async function fetchRecords(api, ids) {
-  const records = [];
-  for (const id of ids) {
-    try {
-      records.push(await api.getRecord(id));
-    } catch (error) {
-      // A record can disappear between filter and get if capture is cleared
-      // concurrently. Skipping it keeps a list call useful instead of fatal.
-      if (error?.code === 'NOT_FOUND') continue;
-      throw error;
+  const records = new Array(ids.length);
+  let next = 0;
+
+  async function worker() {
+    while (next < ids.length) {
+      const index = next;
+      next += 1;
+      try {
+        records[index] = await api.getRecord(ids[index]);
+      } catch (error) {
+        // A record can disappear between filter and get if capture is cleared
+        // concurrently. Skipping it keeps a list call useful instead of fatal.
+        if (error?.code === 'NOT_FOUND') records[index] = null;
+        else throw error;
+      }
     }
   }
-  return records;
+
+  await Promise.all(Array.from({ length: Math.min(FETCH_CONCURRENCY, ids.length) }, worker));
+  return records.filter((record) => record !== null);
 }
 
 /** Explain an empty result, since "nothing captured" and "capture off" differ. */
@@ -91,10 +112,17 @@ async function listCommand(api, values) {
   const records = await fetchRecords(api, ids);
   data.items = records.map(summarize);
 
+  // A record can vanish between the filter call and the fetch, so report what
+  // was actually returned rather than what was selected.
+  if (records.length !== ids.length) {
+    data.returned = records.length;
+    data.missing = ids.length - records.length;
+  }
   if (data.items.length === 0) {
     const hint = await emptyHint(api);
     if (hint) data.hint = hint;
   }
+
 
   return { data };
 }
@@ -130,6 +158,35 @@ session and is reused after a clear.`,
   ],
 };
 
+/**
+ * Write a file, turning a filesystem problem into a usage error.
+ *
+ * A missing parent directory or a denied path is a mistake in the invocation, so
+ * it must exit 2 with a message the caller can act on, not exit 1 as though the
+ * CLI had a defect.
+ */
+function writeOut(file, data) {
+  try {
+    fs.writeFileSync(file, data);
+  } catch (error) {
+    const reason = error.code === 'ENOENT' ? 'the directory does not exist' : error.message;
+    throw usageError(`Cannot write ${file}: ${reason}`);
+  }
+}
+
+/** Copy a file the same way, for a body Reqable stored on disk. */
+function copyOut(from, to) {
+  try {
+    fs.copyFileSync(from, to);
+  } catch (error) {
+    const reason = error.code === 'ENOENT' ? 'the directory does not exist' : error.message;
+    throw usageError(`Cannot write ${to}: ${reason}`);
+  }
+}
+
+/** How many record fetches to keep in flight. Reqable answers locally, so this bounds latency, not load. */
+const FETCH_CONCURRENCY = 8;
+
 // -- capture get ------------------------------------------------------------
 
 async function getCommand(api, values, positionals) {
@@ -139,21 +196,21 @@ async function getCommand(api, values, positionals) {
   const data = { id, record };
 
   if (values.out) {
-    fs.writeFileSync(values.out, `${JSON.stringify(record, null, 2)}\n`, 'utf8');
+    writeOut(values.out, `${JSON.stringify(record, null, 2)}\n`);
     data.savedRecordTo = values.out;
   }
 
   if (values['body-out']) {
     const body = record?.response?.body;
     if (!body || typeof body.text !== 'string') {
-      throw usageError('This record has no response body to write out.');
+      throw notFoundError('This record has no response body to write out.');
     }
     if (body.encoding === 'base64') {
-      fs.writeFileSync(values['body-out'], Buffer.from(body.text, 'base64'));
+      writeOut(values['body-out'], Buffer.from(body.text, 'base64'));
     } else if (body.encoding === 'file') {
-      fs.copyFileSync(body.text, values['body-out']);
+      copyOut(body.text, values['body-out']);
     } else {
-      fs.writeFileSync(values['body-out'], body.text, 'utf8');
+      writeOut(values['body-out'], body.text);
     }
     data.savedResponseBodyTo = values['body-out'];
   }
@@ -210,25 +267,28 @@ async function exportCommand(api, values) {
     throw usageError('--format expects "har" or "json".');
   }
   if (!values.out) {
-    throw usageError('--out is required: name the file to write, or use --out - for stdout.');
+    throw usageError('--out is required: name the file to write.');
   }
-
-  const { filters, ids, total } = await selectIds(api, values);
-  const records = await fetchRecords(api, ids);
-  const document = format === 'har' ? harDocument(records) : { records };
-
-  const text = `${JSON.stringify(document, null, 2)}\n`;
-
-  // Stdout carries the JSON envelope this command prints. Writing the document
-  // there too would put two JSON documents on one stream, which a caller cannot
-  // parse, so this is refused rather than emitted.
+  // Checked before any work. Stdout carries the JSON envelope this command
+  // prints, so writing the document there too would put two JSON documents on
+  // one stream, which a caller cannot parse. Failing up front also avoids
+  // fetching an entire capture before refusing.
   if (values.out === '-') {
     throw usageError(
       "Stdout carries this command's JSON envelope, so --out - is not supported. Name a file instead.",
     );
   }
 
-  fs.writeFileSync(values.out, text, 'utf8');
+  const { filters, ids, total } = await selectIds(api, values);
+  const records = await fetchRecords(api, ids);
+
+  // harDocument returns the count of bodies it could not read beside the
+  // document, so the file stays a valid HAR while the caller still learns that
+  // something was lost.
+  const built = format === 'har' ? harDocument(records) : { document: { records }, unreadableBodies: 0 };
+  const text = `${JSON.stringify(built.document, null, 2)}\n`;
+
+  writeOut(values.out, text);
   const bytes = fs.statSync(values.out).size;
 
   return {
@@ -239,6 +299,14 @@ async function exportCommand(api, values) {
       filters,
       writtenTo: values.out,
       bytes,
+      unreadableBodies: built.unreadableBodies,
+      ...(built.unreadableBodies > 0
+        ? {
+            hint:
+              `${built.unreadableBodies} body value(s) were stored on disk by Reqable and could no longer be read. ` +
+              'They are marked with size -1 and a comment in the export rather than reported as empty.',
+          }
+        : {}),
     },
   };
 }

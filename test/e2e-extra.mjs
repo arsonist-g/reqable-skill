@@ -367,7 +367,7 @@ async function sectionRules() {
     const isGate = raw.status === 401 && String(raw.body?.message ?? '').includes('requires an account');
     if (isGate) gated += 1;
 
-    const created = await cli(['rule', 'set', '--type', type, '--json', JSON.stringify(payload)]);
+    const created = await cli(['rule', 'set', '--type', type, '--payload', JSON.stringify(payload)]);
     check(`rule set reports Reqable's refusal for creating a ${type} without an account`,
       created.code === 4 && created.envelope?.error?.code === 'REQABLE_API_ERROR' &&
         String(created.envelope?.error?.message ?? '').includes('requires an account'),
@@ -410,13 +410,13 @@ async function sectionRules() {
   const noAction = await cli(['rule', 'set', '--type', 'rewrite']);
   check('rule set refuses a call with no action flag', noAction.code === 2 && noAction.envelope?.error?.code === 'USAGE',
     noAction.envelope?.error?.message);
-  const badPayload = await cli(['rule', 'set', '--type', 'rewrite', '--json', '[1,2]']);
+  const badPayload = await cli(['rule', 'set', '--type', 'rewrite', '--payload', '[1,2]']);
   check('rule set refuses a payload that is not a JSON object', badPayload.code === 2,
     badPayload.envelope?.error?.message);
   const badFeature = await cli(['rule', 'set', '--type', 'rewrite', '--feature', 'maybe']);
   check('rule set refuses a --feature value other than on or off', badFeature.code === 2,
     badFeature.envelope?.error?.message);
-  const dry = await cli(['rule', 'set', '--type', 'rewrite', '--json', '{"name":"n","url":"u","action":{}}', '--dry-run']);
+  const dry = await cli(['rule', 'set', '--type', 'rewrite', '--payload', '{"name":"n","url":"u","action":{}}', '--dry-run']);
   check('rule set --dry-run reports the payload without sending it',
     dry.code === 0 && dry.envelope?.data?.applied === false,
     `applied=${dry.envelope?.data?.applied}`);

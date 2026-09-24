@@ -22,6 +22,7 @@ import tls from 'node:tls';
 import zlib from 'node:zlib';
 
 import { apiError, usageError } from '../errors.js';
+import { bareHost, formatHostPort } from '../reqable.js';
 
 const DEFAULT_MAX_BODY = 8192;
 const DEFAULT_TIMEOUT_MS = 30000;
@@ -38,6 +39,19 @@ const DROP_HEADERS = new Set([
 export async function replayCommand(api, values, positionals) {
   const id = parseId(positionals[0]);
   const record = await api.getRecord(id);
+
+  if (record?.protocol === 'websocket') {
+    throw usageError(
+      'This record is a WebSocket exchange, and replay re-sends plain HTTP requests, so it cannot reproduce it. Read its frames with "reqable-cli capture get <id>" instead.',
+    );
+  }
+
+  for (const [flag, value] of [['--timeout', values.timeout], ['--max-body', values['max-body']]]) {
+    if (value !== undefined && (!Number.isInteger(value) || value <= 0)) {
+      throw usageError(`${flag} expects a positive whole number.`);
+    }
+  }
+
 
   const plan = buildPlan(record, values, api);
 
@@ -77,6 +91,23 @@ export async function replayCommand(api, values, positionals) {
 
 function buildPlan(record, values, api) {
   const url = values.url ?? record?.url;
+
+  // Reject a target this command cannot send. Without this, any scheme other
+  // than https falls through to the plain-HTTP path and the request is aimed at
+  // port 80 of that host, which is both wrong and a real request to a real host.
+  if (url) {
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw usageError(`The URL to replay must be absolute, got "${url}".`);
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw usageError(
+        `replay re-sends HTTP requests, so a ${parsed.protocol} target is out of scope. Read the record with "reqable-cli capture get <id>" instead.`,
+      );
+    }
+  }
   if (!url) throw usageError('The record has no URL to replay.');
 
   const method = (values.method ?? record?.request?.method ?? 'GET').toUpperCase();
@@ -104,7 +135,22 @@ function buildPlan(record, values, api) {
     throw usageError('--via expects "direct" or "reqable".');
   }
 
-  const proxy = via === 'reqable' ? values.proxy ?? `http://${api.host}:${api.port}` : null;
+  // A proxy URL that does not parse, or that is not http, would otherwise blow
+  // up as an internal error when the request is built.
+  let proxy = null;
+  if (via === 'reqable') {
+    const candidate = values.proxy ?? `http://${formatHostPort(api.host, api.port)}`;
+    let parsed;
+    try {
+      parsed = new URL(candidate);
+    } catch {
+      throw usageError(`--proxy expects an absolute URL such as http://127.0.0.1:9000, got "${candidate}".`);
+    }
+    if (parsed.protocol !== 'http:') {
+      throw usageError(`--proxy only supports an http:// proxy address, got "${candidate}".`);
+    }
+    proxy = candidate;
+  }
 
   return { method, url, headers, body, via, proxy };
 }
@@ -224,7 +270,10 @@ function sendViaProxy(plan, values, timeoutMs) {
           // SNI is a host name mechanism; passing an IP literal is a protocol
           // violation that Node warns about, and the target is still verified
           // against the IP below.
-          ...(net.isIP(target.hostname) ? {} : { servername: target.hostname }),
+          // `target.hostname` keeps the brackets a URL parser added around an
+          // IPv6 literal, so asking net.isIP about it answers "not an IP" and
+          // sends `[::1]` out as SNI.
+          ...(net.isIP(bareHost(target.hostname)) ? {} : { servername: target.hostname }),
           // Reqable intercepts this tunnel, so the leaf certificate comes from
           // it. Verification can only pass when that CA is trusted by this
           // process, which is why the caller must opt in with --insecure.

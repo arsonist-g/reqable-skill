@@ -51,6 +51,11 @@ export function parseArgs(argv, spec) {
       inlineValue = eq === -1 ? undefined : token.slice(eq + 1);
     } else if (token.startsWith('-') && token.length > 1 && !/^-\d/.test(token)) {
       const alias = token.slice(1);
+      // `-h` means help wherever it appears, not only as the first argument.
+      if (alias === 'h') {
+        values.help = true;
+        continue;
+      }
       name = aliasToName.get(alias);
       if (!name) throw usageError(`Unknown option: ${token}`);
     } else {
@@ -131,17 +136,21 @@ const AUTO_TRANSPORT_HELP = [
  * @param {string[]} [args.examples]
  * @param {string} [args.notes]
  */
-export function renderHelp({ command, summary, options, examples, notes }) {
+export function renderHelp({ command, summary, options, examples, notes, noTransport }) {
   const lines = [];
   lines.push(`reqable-cli ${command} — ${summary}`);
   lines.push('');
 
-  // Every command also accepts the transport flags. Append whichever ones this
-  // command's help forgot, so the rendered help always matches the parser.
+  // Commands that talk to Reqable also accept the transport flags. Append
+  // whichever ones this command's help forgot, so the rendered help always
+  // matches the parser. Commands that never talk to Reqable opt out, because
+  // advertising a flag that does nothing is worse than omitting it.
   const documented = [...(options ?? [])];
-  for (const entry of AUTO_TRANSPORT_HELP) {
-    const flag = entry.name.split(' ')[0];
-    if (!documented.some((opt) => opt.name.startsWith(flag))) documented.push(entry);
+  if (!noTransport) {
+    for (const entry of AUTO_TRANSPORT_HELP) {
+      const flag = entry.name.split(' ')[0];
+      if (!documented.some((opt) => opt.name.startsWith(flag))) documented.push(entry);
+    }
   }
 
   if (documented.length) {

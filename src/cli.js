@@ -22,6 +22,7 @@ import { parseArgs, renderHelp } from './args.js';
 import { captureHelp, captureSubcommands } from './commands/capture.js';
 import { replayCommand, replayHelp } from './commands/replay.js';
 import { ruleHelp, ruleSubcommands } from './commands/rule.js';
+import { skillHelp, skillSubcommands } from './commands/skill.js';
 import { statusCommand, statusHelp } from './commands/status.js';
 import { EXIT, usageError } from './errors.js';
 import { print, printHelp, run } from './output.js';
@@ -30,7 +31,9 @@ import { ReqableApi } from './reqable.js';
 const VERSION = '1.0.0';
 
 /** Flags accepted by every command. */
-const rootFlags = {
+// Exported for the parity test: it rebuilds each command's spec exactly as the
+// dispatcher does and compares it with the rendered help.
+export const rootFlags = {
   'api-host': { type: 'string', description: 'Reqable API host.' },
   'api-port': { type: 'number', description: "Reqable API port. Defaults to Reqable's configured proxy port, else 9000." },
   pretty: { type: 'boolean', description: 'Indent the JSON output.' },
@@ -51,6 +54,9 @@ Commands:
   capture on | off                  Start and stop capture
   replay <id>                       Re-send a captured request
   rule list | set                   Inspect and change breakpoints, rewrites, scripts
+
+Setup (a one-time action, not part of capture work):
+  skill install                     Write the agent-facing skill into a skills directory
 
 Global options:
   --api-host <host>  Reqable API host. [default: 127.0.0.1]
@@ -113,6 +119,14 @@ export async function main(argv) {
         subcommands: ruleSubcommands,
         args: [second, ...rest],
       });
+    case 'skill':
+      return await runBranch({
+        branch: 'skill',
+        baseFlags: {},
+        branchHelp: skillHelp,
+        subcommands: skillSubcommands,
+        args: [second, ...rest],
+      });
     case 'replay':
       return await runLeaf(
         'replay',
@@ -147,21 +161,27 @@ async function runLeaf(command, body, help, flags, positionals, argv, extra = {}
 
   if (parsed.values.help) return printHelp(renderHelp(help));
 
-  const api = new ReqableApi({ host: parsed.values['api-host'], port: parsed.values['api-port'] });
-  return run(command, parsed.values, () => body(api, parsed.values, parsed.positionals));
+  // Constructed inside the body, not before it: the constructor validates
+  // --api-host and --api-port and throws CliError, and `run` is what turns a
+  // CliError into the JSON envelope. Building it out here let a usage error
+  // escape as a raw stack trace with an empty stdout and exit 1.
+  return run(command, parsed.values, () => {
+    const api = new ReqableApi({ host: parsed.values['api-host'], port: parsed.values['api-port'] });
+    return body(api, parsed.values, parsed.positionals);
+  });
 }
 
 /**
  * Run a branch command such as `capture` or `rule`, resolving its subcommand.
  */
-async function runBranch({ branch, branchHelp, subcommands, args }) {
+async function runBranch({ branch, branchHelp, subcommands, args, baseFlags = rootFlags }) {
   const [rawSub, ...rest] = args;
 
   if (rawSub === undefined || rawSub === '--help' || rawSub === '-h') {
     return printHelp(renderHelp(branchHelp));
   }
 
-  const sub = subcommands[rawSub];
+  const sub = Object.hasOwn(subcommands, rawSub) ? subcommands[rawSub] : undefined;
   if (!sub) {
     return run(`${branch} ${rawSub}`, {}, async () => {
       throw usageError(
@@ -172,7 +192,7 @@ async function runBranch({ branch, branchHelp, subcommands, args }) {
 
   const command = `${branch} ${rawSub}`;
   const spec = {
-    flags: { ...rootFlags, ...sub.flags },
+    flags: { ...baseFlags, ...sub.flags },
     positionals: sub.positionals,
     maxPositionals: sub.maxPositionals ?? sub.positionals?.length ?? 0,
   };
@@ -189,12 +209,15 @@ async function runBranch({ branch, branchHelp, subcommands, args }) {
 
   if (parsed.values.help) return printHelp(renderHelp(sub.help));
 
-  const api = new ReqableApi({ host: parsed.values['api-host'], port: parsed.values['api-port'] });
-  return run(command, parsed.values, () => sub.run(api, parsed.values, parsed.positionals));
+  // Same reason as runLeaf: validation errors must land inside `run`'s envelope.
+  return run(command, parsed.values, () => {
+    const api = new ReqableApi({ host: parsed.values['api-host'], port: parsed.values['api-port'] });
+    return sub.run(api, parsed.values, parsed.positionals);
+  });
 }
 
 /** Flags specific to `replay`, kept next to its help definition. */
-function replayFlags() {
+export function replayFlags() {
   return {
     via: { type: 'string' },
     proxy: { type: 'string' },
@@ -212,8 +235,15 @@ function replayFlags() {
 
 function helpFor(parts) {
   const [branch, sub] = parts;
-  if (branch === 'capture') return sub && captureSubcommands[sub] ? renderHelp(captureSubcommands[sub].help) : renderHelp(captureHelp);
-  if (branch === 'rule') return sub && ruleSubcommands[sub] ? renderHelp(ruleSubcommands[sub].help) : renderHelp(ruleHelp);
+  // Object.hasOwn, for the same reason as runBranch: a name such as
+  // `constructor` must not resolve through Object.prototype. A helper that
+  // threw here would leave stdout without its JSON envelope.
+  const pick = (map, branchHelp) =>
+    sub && Object.hasOwn(map, sub) ? renderHelp(map[sub].help) : renderHelp(branchHelp);
+
+  if (branch === 'capture') return pick(captureSubcommands, captureHelp);
+  if (branch === 'rule') return pick(ruleSubcommands, ruleHelp);
+  if (branch === 'skill') return pick(skillSubcommands, skillHelp);
   if (branch === 'status') return renderHelp(statusHelp);
   if (branch === 'replay') return renderHelp(replayHelp);
   return rootHelpText;
