@@ -3,3 +3,4 @@ npm-debug.log*
 *.har
 .e2e-*
 .pi/
+project-memory/
