@@ -3,6 +3,15 @@
   "version": "1.0.0",
   "description": "Command-line front end for Reqable's local capture API: list, inspect, export and replay captured traffic without registering an MCP server.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arsonist-g/reqable-skill.git"
+  },
+  "homepage": "https://github.com/arsonist-g/reqable-skill#readme",
+  "bugs": {
+    "url": "https://github.com/arsonist-g/reqable-skill/issues"
+  },
+  "author": "arsonist-g",
   "type": "module",
   "bin": {
     "reqable-cli": "bin/reqable-cli.js"
