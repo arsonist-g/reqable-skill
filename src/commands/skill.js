@@ -36,7 +36,7 @@ const SKILL_FILES = [
 
 /** Where agent runtimes look for skills by default. */
 function defaultSkillsDir() {
-  return path.join(os.homedir(), '.agents', 'skills');
+  return path.join(os.homedir(), '.codex', 'skills');
 }
 
 /**
@@ -234,8 +234,8 @@ export const skillSubcommands = {
         { name: '--pretty', description: 'Indent the JSON output.' },
         { name: '--help', description: 'Show this help and exit 0.' },
       ],
-      notes: `The default target is a reqable-cli directory under the user's ~/.agents/skills,
-which is where agent runtimes look for skills.
+      notes: `The default target is a reqable-cli directory under the user's ~/.codex/skills,
+which is Codex's dedicated skill directory and remains visible through WSL mapping.
 
 This command never touches Reqable: it only writes files inside the chosen
 directory. It refuses to overwrite an existing install without --force, and it

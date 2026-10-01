@@ -13,7 +13,7 @@ This CLI does not re-expose a hundred tools. It exposes ten entry points shaped 
 ```sh
 npm install -g reqable-cli        # from the registry
 reqable-cli --version
-reqable-cli skill install         # write the bundled agent skill into ~/.agents/skills
+reqable-cli skill install         # write the bundled agent skill into ~/.codex/skills
 reqable-cli status                # is Reqable reachable, and is capture on
 ```
 
@@ -179,11 +179,11 @@ Deliberately not exposed, with reasons in `docs/endpoints.md`: `/proxy/set` (it 
 
 `SKILL.md` is the entry point an agent loads, with `references/install-and-config.md` and `references/errors.md` for the rare paths. Chinese translations sit beside each file. The skill is self-contained: it names only the installed `reqable-cli` command and its own reference files, so it can be installed anywhere the CLI is.
 
-`reqable-cli skill install` writes the six files to a skill directory, `~/.agents/skills/reqable-cli` by default. It reads them from inside the installed package, so it does not care where you ran it from, and it refuses to replace an existing install without `--force`:
+`reqable-cli skill install` writes the six files to a skill directory, `~/.codex/skills/reqable-cli` by default. It reads them from inside the installed package, so it does not care where you ran it from, and it refuses to replace an existing install without `--force`:
 
 ```sh
 reqable-cli skill install --dry-run            # where it would write, and which files
-reqable-cli skill install                      # ~/.agents/skills/reqable-cli
+reqable-cli skill install                      # ~/.codex/skills/reqable-cli
 reqable-cli skill install --dir ./skills       # somewhere else
 reqable-cli skill install --force              # replace; the target directory is removed first
 ```

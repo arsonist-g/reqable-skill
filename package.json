@@ -1,6 +1,6 @@
 {
   "name": "reqable-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Command-line front end for Reqable's local capture API: list, inspect, export and replay captured traffic without registering an MCP server.",
   "license": "MIT",
   "repository": {

@@ -25,7 +25,7 @@ Reqable 内部的 Python 脚本功能与本 CLI 无关。规则脚本是 Reqable
 ```sh
 npm install -g reqable-cli
 reqable-cli --version
-reqable-cli skill install      # 把 agent 技能写入 ~/.agents/skills
+reqable-cli skill install      # 把 agent 技能写入 ~/.codex/skills
 ```
 
 或者从该包的源码目录安装：
@@ -39,7 +39,7 @@ npm install -g .               # 或改为全局安装
 
 Reqable 版本较旧时要用对应的旧发布线：`npm install -g reqable-cli@reqable-3.2`。`reqable-cli status` 会把查到的 Reqable 版本与本构建支持的发布线并排报出，所以这种不匹配在它变成失败调用之前就能看到。
 
-`skill install` 是安装步骤，不属于流量接口。它把技能从已安装的包里复制到 `~/.agents/skills/reqable-cli`（或 `--dir <path>`），不带 `--force` 时拒绝覆盖，且完全不接触 Reqable。只有在技能尚未安装时，agent 才需要它。
+`skill install` 是安装步骤，不属于流量接口。它把技能从已安装的包里复制到 `~/.codex/skills/reqable-cli`（或 `--dir <path>`），不带 `--force` 时拒绝覆盖，且完全不接触 Reqable。只有在技能尚未安装时，agent 才需要它。
 
 ## 健康检查
 

@@ -23,7 +23,7 @@ From the registry, on a machine that has Node 20.11 or newer:
 ```sh
 npm install -g reqable-cli
 reqable-cli --version
-reqable-cli skill install      # writes the agent skill into ~/.agents/skills
+reqable-cli skill install      # writes the agent skill into ~/.codex/skills
 ```
 
 From a checkout of the package instead:
@@ -37,7 +37,7 @@ No form needs a network fetch at run time: the CLI has no runtime dependencies.
 
 An older Reqable needs the older release line: `npm install -g reqable-cli@reqable-3.2`. `reqable-cli status` reports the Reqable version it found next to the line this build supports, so the mismatch is visible before it turns into a failing call.
 
-`skill install` is a setup step, not part of the traffic interface. It copies the skill out of the installed package into `~/.agents/skills/reqable-cli` (or `--dir <path>`), refuses to overwrite without `--force`, and never talks to Reqable. An agent needs it only when the skill is not installed yet.
+`skill install` is a setup step, not part of the traffic interface. It copies the skill out of the installed package into `~/.codex/skills/reqable-cli` (or `--dir <path>`), refuses to overwrite without `--force`, and never talks to Reqable. An agent needs it only when the skill is not installed yet.
 
 ## Health check
 

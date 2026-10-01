@@ -23,7 +23,7 @@ import { parseArgs, renderHelp } from '../src/args.js';
 import { captureSubcommands } from '../src/commands/capture.js';
 import { replayHelp } from '../src/commands/replay.js';
 import { ruleSubcommands } from '../src/commands/rule.js';
-import { skillSubcommands } from '../src/commands/skill.js';
+import { defaultSkillsDir, skillSubcommands } from '../src/commands/skill.js';
 import { statusHelp } from '../src/commands/status.js';
 import { replayFlags, rootFlags } from '../src/cli.js';
 import {
@@ -392,6 +392,10 @@ test('each error helper carries its documented exit code', () => {
 });
 
 // --------------------------------------------------------------- packaged skill
+
+test('the default Codex skill directory is the dedicated one', () => {
+  assert.equal(defaultSkillsDir(), path.join(os.homedir(), '.codex', 'skills'));
+});
 
 test('every file the skill install copies is present in this checkout', () => {
   const root = new URL('..', import.meta.url);
