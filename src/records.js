@@ -256,7 +256,7 @@ export function harDocument(records) {
     document: {
       log: {
         version: '1.2',
-        creator: { name: 'reqable-cli', version: '1.0.0' },
+        creator: { name: 'reqable-cli', version: '1.0.2' },
         entries,
       },
     },

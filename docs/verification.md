@@ -24,7 +24,7 @@ Evidence, from the source:
 
 Evidence, from the live instance: `curl -s http://127.0.0.1:9000/capture/live/status` returns `{"status":"inactive"}` with no credential supplied.
 
-Consequence for the CLI: it reads no secret from anywhere, so no key can leak into this repository. It sends a User-Agent identifying itself as `reqable-cli/1.0.0`.
+Consequence for the CLI: it reads no secret from anywhere, so no key can leak into this repository. It sends a User-Agent identifying itself as `reqable-cli/1.0.2`.
 
 ### 3. The default port discovery logic
 

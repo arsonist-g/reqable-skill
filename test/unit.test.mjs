@@ -136,6 +136,13 @@ test('package.json declares the same Reqable line as the code', () => {
   assert.equal(pkg.reqable.verifiedWith, VERIFIED_REQABLE);
 });
 
+test('CLI version follows package.json', () => {
+  const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  const cli = fileURLToPath(new URL('../bin/reqable-cli.js', import.meta.url));
+  const out = JSON.parse(execFileSync(process.execPath, [cli, '--version'], { encoding: 'utf8' }));
+  assert.equal(out.version, pkg.version);
+});
+
 // ------------------------------------------------------------------ filters
 
 test('buildFilters maps flags onto Reqable filter objects', () => {

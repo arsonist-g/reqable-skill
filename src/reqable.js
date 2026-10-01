@@ -270,7 +270,7 @@ export class ReqableApi {
       method,
       headers: {
         accept: 'application/json',
-        'user-agent': 'reqable-cli/1.0.0',
+        'user-agent': 'reqable-cli/1.0.2',
         ...(isPost
           ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) }
           : {}),

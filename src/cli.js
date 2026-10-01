@@ -28,7 +28,7 @@ import { EXIT, usageError } from './errors.js';
 import { print, printHelp, run } from './output.js';
 import { ReqableApi } from './reqable.js';
 
-const VERSION = '1.0.0';
+const VERSION = '1.0.2';
 
 /** Flags accepted by every command. */
 // Exported for the parity test: it rebuilds each command's spec exactly as the
