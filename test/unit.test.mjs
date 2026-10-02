@@ -23,7 +23,7 @@ import { parseArgs, renderHelp } from '../src/args.js';
 import { captureSubcommands } from '../src/commands/capture.js';
 import { replayHelp } from '../src/commands/replay.js';
 import { ruleSubcommands } from '../src/commands/rule.js';
-import { defaultSkillsDir, skillSubcommands } from '../src/commands/skill.js';
+import { DEFAULT_TARGET, SKILL_TARGETS, defaultSkillsDir, skillSubcommands } from '../src/commands/skill.js';
 import { statusHelp } from '../src/commands/status.js';
 import { replayFlags, rootFlags } from '../src/cli.js';
 import {
@@ -400,8 +400,12 @@ test('each error helper carries its documented exit code', () => {
 
 // --------------------------------------------------------------- packaged skill
 
-test('the default Codex skill directory is the dedicated one', () => {
+test('each named target points at that runtime’s own skill directory', () => {
+  assert.deepEqual(Object.keys(SKILL_TARGETS), ['codex', 'claude']);
+  assert.equal(DEFAULT_TARGET, 'codex', 'the default must stay the pre-existing target');
   assert.equal(defaultSkillsDir(), path.join(os.homedir(), '.codex', 'skills'));
+  assert.equal(defaultSkillsDir('claude'), path.join(os.homedir(), '.claude', 'skills'));
+  assert.equal(defaultSkillsDir('codex'), path.join(os.homedir(), '.codex', 'skills'));
 });
 
 test('every file the skill install copies is present in this checkout', () => {
@@ -560,6 +564,36 @@ test('skill install reports an unusable --dir as a usage error, not an internal 
     [['--dir', aFile], /which is a file/],
     [['--dir=', ], /empty value/],
     [['--dir', path.join(aFile, 'under-a-file')], /ENOTDIR|cannot be used/],
+  ];
+  for (const [args, expected] of cases) {
+    const result = runCli(['skill', 'install', ...args]);
+    const label = `skill install ${args.join(' ')}`;
+    assert.equal(result.status, EXIT.USAGE, `${label} should exit 2, got ${result.status}`);
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.error.code, 'USAGE');
+    assert.match(parsed.error.message, expected);
+  }
+});
+
+test('skill install --target claude aims at the Claude Code skill directory', () => {
+  const result = runCli(['skill', 'install', '--target', 'claude', '--dry-run']);
+  assert.equal(result.status, 0, result.stdout);
+  const parsed = JSON.parse(result.stdout);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.data.applied, false, 'a dry run must not write');
+  assert.equal(parsed.data.target, 'claude');
+  assert.equal(parsed.data.targetLabel, SKILL_TARGETS.claude.label);
+  assert.equal(parsed.data.targetDir, path.join(os.homedir(), '.claude', 'skills', 'reqable-cli'));
+});
+
+test('--target rejects an unknown runtime, and refuses to pair with --dir', () => {
+  // Both flags name the destination. Resolving that by precedence would leave
+  // the caller guessing which one won, so it is a usage error instead.
+  const cases = [
+    [['--target', 'cursor'], /not an agent runtime this command knows/],
+    [['--target='], /not an agent runtime this command knows/],
+    [['--target', 'claude', '--dir', os.tmpdir()], /both name the destination/],
   ];
   for (const [args, expected] of cases) {
     const result = runCli(['skill', 'install', ...args]);

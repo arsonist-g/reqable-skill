@@ -24,6 +24,24 @@ import { CliError, confirmationError, usageError } from '../errors.js';
 /** Directory name the skill takes, matching the `name` in its frontmatter. */
 const SKILL_NAME = 'reqable-cli';
 
+/**
+ * The skill directories of the agent runtimes this command knows by name, keyed
+ * by the `--target` value. Each `segments` list is relative to the user's home,
+ * and the skill goes into a `reqable-cli` subdirectory of it:
+ *
+ * - codex:  Codex's dedicated skill directory, which stays visible when Codex
+ *           runs through WSL.
+ * - claude: Claude Code's user-level skill directory. A directory under it is
+ *           also picked up as a plugin (`reqable-cli@skills-dir`).
+ *
+ * `--dir` remains the escape hatch for any other runtime or layout, and is the
+ * only way to name a directory that is not one of these two.
+ */
+const SKILL_TARGETS = {
+  codex: { label: 'Codex CLI', segments: ['.codex', 'skills'] },
+  claude: { label: 'Claude Code', segments: ['.claude', 'skills'] },
+};
+
 /** Files the skill consists of, relative to the package root. The order is the report order. */
 const SKILL_FILES = [
   'SKILL.md',
@@ -34,9 +52,12 @@ const SKILL_FILES = [
   'references/errors-zh.md',
 ];
 
-/** Where agent runtimes look for skills by default. */
-function defaultSkillsDir() {
-  return path.join(os.homedir(), '.codex', 'skills');
+/** The target used when `--target` is not given. */
+const DEFAULT_TARGET = 'codex';
+
+/** Where an agent runtime looks for skills by default. */
+function defaultSkillsDir(target = DEFAULT_TARGET) {
+  return path.join(os.homedir(), ...SKILL_TARGETS[target].segments);
 }
 
 /**
@@ -82,6 +103,26 @@ function describeTarget({ kind, error }) {
 export async function skillInstallCommand(values) {
   const root = packageRoot();
 
+  // `--target` names an agent runtime, `--dir` names a directory. Passing both
+  // states the same thing two ways and leaves which one wins to the reader, so
+  // it is rejected rather than resolved by precedence.
+  if (values.target !== undefined && values.dir !== undefined) {
+    throw usageError(
+      '--target and --dir both name the destination. Pass --target <name> for an agent ' +
+        "runtime's default directory, or --dir <path> for a directory of your own.",
+      { target: values.target, dir: values.dir },
+    );
+  }
+
+  const target = values.target === undefined ? DEFAULT_TARGET : String(values.target).trim();
+  if (!Object.hasOwn(SKILL_TARGETS, target)) {
+    throw usageError(
+      `--target was given "${target}", which is not an agent runtime this command knows. ` +
+        `Pass one of ${Object.keys(SKILL_TARGETS).join(', ')}, or pass --dir to install into a directory of your own.`,
+      { target: values.target },
+    );
+  }
+
   // `--dir=` gives an empty string, which is not nullish, and path.resolve('')
   // is the current directory. Left alone that silently aims the install -- and,
   // under --force, the removal -- at ./reqable-cli. An empty value almost always
@@ -89,12 +130,12 @@ export async function skillInstallCommand(values) {
   if (values.dir !== undefined && String(values.dir).trim() === '') {
     throw usageError(
       '--dir was given an empty value. Pass a directory, or omit --dir to install into ' +
-        `${defaultSkillsDir()}.`,
+        `${defaultSkillsDir(target)}.`,
       { dir: values.dir },
     );
   }
 
-  const skillsDir = path.resolve(values.dir ?? defaultSkillsDir());
+  const skillsDir = path.resolve(values.dir ?? defaultSkillsDir(target));
   const targetDir = path.join(skillsDir, SKILL_NAME);
 
   // A --dir that names a file, cannot be inspected, or resolves to something that
@@ -115,7 +156,7 @@ export async function skillInstallCommand(values) {
   if (dirProblem !== null) {
     throw usageError(
       `--dir points at ${skillsDir}, which ${dirProblem}. ` +
-        `Pass a directory that can hold a ${SKILL_NAME} subdirectory, or omit --dir to use ${defaultSkillsDir()}.`,
+        `Pass a directory that can hold a ${SKILL_NAME} subdirectory, or omit --dir to use ${defaultSkillsDir(target)}.`,
       { skillsDir },
     );
   }
@@ -155,6 +196,8 @@ export async function skillInstallCommand(values) {
       data: {
         applied: false,
         skill: SKILL_NAME,
+        target,
+        targetLabel: SKILL_TARGETS[target].label,
         skillsDir,
         targetDir,
         wouldOverwrite: existing,
@@ -205,6 +248,8 @@ export async function skillInstallCommand(values) {
     data: {
       applied: true,
       skill: SKILL_NAME,
+      target,
+      targetLabel: SKILL_TARGETS[target].label,
       skillsDir,
       targetDir,
       overwrote: existing,
@@ -224,7 +269,15 @@ export const skillSubcommands = {
       noTransport: true,
       summary: 'write the agent-facing skill shipped with reqable-cli into a skills directory',
       options: [
-        { name: '--dir <path>', description: 'Skills directory to install into. The skill goes in a reqable-cli subdirectory of it.' },
+        {
+          name: '--target <name>',
+          values: Object.keys(SKILL_TARGETS),
+          default: DEFAULT_TARGET,
+          description:
+            "Agent runtime to install for: its own skill directory under the user's home is used. " +
+            `${SKILL_TARGETS.codex.label} -> ~/.codex/skills, ${SKILL_TARGETS.claude.label} -> ~/.claude/skills.`,
+        },
+        { name: '--dir <path>', description: 'Skills directory to install into, for a runtime --target does not name or a layout of your own. The skill goes in a reqable-cli subdirectory of it. Mutually exclusive with --target.' },
         {
           name: '--force',
           description:
@@ -234,8 +287,10 @@ export const skillSubcommands = {
         { name: '--pretty', description: 'Indent the JSON output.' },
         { name: '--help', description: 'Show this help and exit 0.' },
       ],
-      notes: `The default target is a reqable-cli directory under the user's ~/.codex/skills,
-which is Codex's dedicated skill directory and remains visible through WSL mapping.
+      notes: `The default target is codex: a reqable-cli directory under the user's
+~/.codex/skills, Codex's dedicated skill directory, which remains visible through
+WSL mapping. Pass --target claude for Claude Code's ~/.claude/skills, or --dir for
+any other directory.
 
 This command never touches Reqable: it only writes files inside the chosen
 directory. It refuses to overwrite an existing install without --force, and it
@@ -246,10 +301,12 @@ goes with it. Nothing outside that one subdirectory is written or removed.`,
       examples: [
         'reqable-cli skill install --dry-run',
         'reqable-cli skill install',
+        'reqable-cli skill install --target claude',
         'reqable-cli skill install --dir /path/to/my/skills --force',
       ],
     },
     flags: {
+      target: { type: 'string' },
       dir: { type: 'string' },
       force: { type: 'boolean' },
       'dry-run': { type: 'boolean' },
@@ -273,4 +330,4 @@ rest of this CLI.`,
   examples: ['reqable-cli skill install', 'reqable-cli skill install --dir ./skills --force'],
 };
 
-export { SKILL_FILES, SKILL_NAME, defaultSkillsDir };
+export { DEFAULT_TARGET, SKILL_FILES, SKILL_NAME, SKILL_TARGETS, defaultSkillsDir };
